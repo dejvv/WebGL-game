@@ -65,7 +65,6 @@ function createShader(shaderType, shaderText){
         console.error("ERROR pri prevajanju " + (shaderType === "vertexShader" ? "vertexShader," : "fragmentShader,"), gl.getShaderInfoLog(shader));
         return null;
     }
-
     return shader;
 }
 
@@ -104,16 +103,28 @@ function initBuffers() {
 
     // kje se nahaja v shaderju attribut, njegova lokacija
     let positionAttribLocation = gl.getAttribLocation(shaderProgram, "vertPosition");
+    let colorAttribLocation = gl.getAttribLocation(shaderProgram, "vertColor");
+
     gl.vertexAttribPointer(
         positionAttribLocation, // lokacija tega atributa
         2, // stevilo elementov na atribut
         gl.FLOAT, // tip podatkov
         gl.FALSE, // ali so podatki normalizirani
-        2 * Float32Array.BYTES_PER_ELEMENT,// velikost posamezne tocke
+        5 * Float32Array.BYTES_PER_ELEMENT,// velikost posamezne tocke
         0 // "offset", torej ali imam še kakšne podatke v tem arrayu, za koliko se naj odmaknem, da najdem prave
     );
 
+    gl.vertexAttribPointer(
+        colorAttribLocation, // lokacija tega atributa
+        3, // stevilo elementov na atribut
+        gl.FLOAT, // tip podatkov
+        gl.FALSE, // ali so podatki normalizirani
+        5 * Float32Array.BYTES_PER_ELEMENT,// velikost posamezne tocke
+        2 * Float32Array.BYTES_PER_ELEMENT// "offset", torej ali imam še kakšne podatke v tem arrayu, za koliko se naj odmaknem, da najdem prave
+    );
+
     gl.enableVertexAttribArray(positionAttribLocation);
+    gl.enableVertexAttribArray(colorAttribLocation);
 }
 
 function renderGame() {
@@ -132,9 +143,12 @@ const vertexShaderText = [
     'precision mediump float;',
     '',
     'attribute vec2 vertPosition;',
+    'attribute vec3 vertColor;',
+    'varying vec3 fragColor;',
     '',
     'void main()',
     '{',
+    '  fragColor = vertColor;',
     '  gl_Position = vec4(vertPosition, 0.0, 1.0);',
     '}'
 ].join('\n');
@@ -142,17 +156,16 @@ const vertexShaderText = [
 const fragmentShaderText = [
     'precision mediump float;',
     '',
+    'varying vec3 fragColor;',
     'void main()',
     '{',
-    '  gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);',
+    '  gl_FragColor = vec4(fragColor, 1.0);',
     '}'
 ].join('\n');
-//    '  gl_FragColor = vec4(fragColor, 1.0);',
-
 
 let triangleVertices = [
-      // X,    Y,      R,   G,   B
-        0.0,  0.5,
-       -0.5, -0.5,
-        0.5, -0.5,
+    // X,    Y,      R,   G,   B
+      0.0,  0.5,    1.0, 0.8, 0.3,
+     -0.5, -0.5,    0.7, 0.0, 1.0,
+      0.5, -0.5,    0.8, 1.0, 0.7
 ];
