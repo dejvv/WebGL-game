@@ -25,8 +25,12 @@ function start(){
     initBuffers();
 
     // Set up to draw the scene periodically every 15ms.
-    //setInterval(renderGame, 15);
-    renderGame();
+    // Set up to draw the scene periodically.
+    setInterval(function() {
+        // requestAnimationFrame(animate);
+        renderGame();
+    }, 15);
+    // renderGame();
 }
 
 function initGl(canvas){
@@ -128,6 +132,11 @@ function initBuffers() {
 }
 
 function renderGame() {
+    // set the rendering environment to full canvas size
+    gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+    // Clear the canvas before we start drawing on it.
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
     // rišem trikotnik, 0 točk prekosčim, 3 točke narišem
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
