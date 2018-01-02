@@ -26,11 +26,21 @@ function start(){
 
     // Set up to draw the scene periodically every 15ms.
     // Set up to draw the scene periodically.
-    setInterval(function() {
-        // requestAnimationFrame(animate);
-        renderGame();
-    }, 15);
+    // setInterval(function() {
+    //     // requestAnimationFrame(animate);
+    //     renderGame();
+    // }, 15);
+
+    // requestAnimationFrame(renderGame);
     // renderGame();
+    tick();
+}
+
+function setMatrixUniforms() {
+    gl.uniformMatrix4fv(shaderProgram.projMatrixUniform, false, projMatrix);
+    gl.uniformMatrix4fv(shaderProgram.worldMatrixUniform, false, worldMatrix);
+    gl.uniformMatrix4fv(shaderProgram.viewMatrixUniform, false, viewMatrix);
+
 }
 
 function initGl(canvas){
@@ -94,6 +104,11 @@ function initShaders() {
     }
 
     gl.useProgram(shaderProgram);
+
+    shaderProgram.projMatrixUniform = gl.getUniformLocation(shaderProgram, "mProj");
+    shaderProgram.worldMatrixUniform = gl.getUniformLocation(shaderProgram, "mWorld");
+    shaderProgram.viewMatrixUniform = gl.getUniformLocation(shaderProgram, "mView");
+
 }
 
 function initBuffers() {
@@ -111,10 +126,10 @@ function initBuffers() {
 
     gl.vertexAttribPointer(
         positionAttribLocation, // lokacija tega atributa
-        2, // stevilo elementov na atribut
+        3, // stevilo elementov na atribut
         gl.FLOAT, // tip podatkov
         gl.FALSE, // ali so podatki normalizirani
-        5 * Float32Array.BYTES_PER_ELEMENT,// velikost posamezne tocke
+        6 * Float32Array.BYTES_PER_ELEMENT,// velikost posamezne tocke
         0 // "offset", torej ali imam še kakšne podatke v tem arrayu, za koliko se naj odmaknem, da najdem prave
     );
 
@@ -123,8 +138,8 @@ function initBuffers() {
         3, // stevilo elementov na atribut
         gl.FLOAT, // tip podatkov
         gl.FALSE, // ali so podatki normalizirani
-        5 * Float32Array.BYTES_PER_ELEMENT,// velikost posamezne tocke
-        2 * Float32Array.BYTES_PER_ELEMENT// "offset", torej ali imam še kakšne podatke v tem arrayu, za koliko se naj odmaknem, da najdem prave
+        6 * Float32Array.BYTES_PER_ELEMENT,// velikost posamezne tocke
+        3 * Float32Array.BYTES_PER_ELEMENT// "offset", torej ali imam še kakšne podatke v tem arrayu, za koliko se naj odmaknem, da najdem prave
     );
 
     gl.enableVertexAttribArray(positionAttribLocation);
@@ -137,28 +152,71 @@ function renderGame() {
     // Clear the canvas before we start drawing on it.
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+    // Set the drawing position to the "identity" point, which is
+    // the center of the scene.
+    mat4.identity(worldMatrix);
+    mat4.lookAt(viewMatrix, [0, 0, -2], [0, 0, 0], [0, 1, 0]);
+    // Establish the perspective with which we want to view the
+    // scene. Our field of view is 45 degrees, with a width/height
+    // ratio and we only want to see objects between 0.1 units
+    // and 1000 units away from the camera.
+    mat4.perspective(projMatrix, glMatrix.toRadian(45), gl.viewportWidth / gl.viewportHeight, 0.1, 1000.0);
+
+    setMatrixUniforms();
     // rišem trikotnik, 0 točk prekosčim, 3 točke narišem
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+    i++;
+    console.log(i);
 }
 
+function animate() {
+    timeNow = new Date().getTime();
+    if (lastTime !== 0) {
+        angle += (90 * timeNow - lastTime) / 1000.0;
+    }
+    lastTime = timeNow;
+}
+
+// Samo za animacijo
+function tick(){
+    requestAnimationFrame(tick);
+    renderGame();
+    animate();
+}
+
+let i = 0;
 // spremenljivke
 let vertexShader; // vertex shader
 let fragmentShader; // fragment shader
 let shaderProgram; // shader program
 let canvas; // canvas
-let gl; // webgl conten
+let gl; // webgl content
+
+// matrike
+let worldMatrix = mat4.create(); // matrika sveta
+let projMatrix = mat4.create(); // projekcijska matrika
+let viewMatrix = mat4.create(); // matrika pogleda
+
+// kot obračanja, spremenljivke za računanje
+let angle = 0;
+let lastTime = 0;
+let timeNow;
 
 const vertexShaderText = [
     'precision mediump float;',
     '',
-    'attribute vec2 vertPosition;',
+    'attribute vec3 vertPosition;',
     'attribute vec3 vertColor;',
     'varying vec3 fragColor;',
+    'uniform mat4 mWorld;',
+    'uniform mat4 mView;',
+    'uniform mat4 mProj;',
     '',
     'void main()',
     '{',
     '  fragColor = vertColor;',
-    '  gl_Position = vec4(vertPosition, 0.0, 1.0);',
+    '  gl_Position = mProj * mView * mWorld * vec4(vertPosition, 1.0);',
     '}'
 ].join('\n');
 
@@ -173,8 +231,8 @@ const fragmentShaderText = [
 ].join('\n');
 
 let triangleVertices = [
-    // X,    Y,      R,   G,   B
-      0.0,  0.5,    1.0, 0.8, 0.3,
-     -0.5, -0.5,    0.7, 0.0, 1.0,
-      0.5, -0.5,    0.8, 1.0, 0.7
+    // X,    Y,   Z,     R,   G,   B
+      0.0,  0.5, 0.0,   1.0, 0.8, 0.3,
+     -0.5, -0.5, 0.0,   0.7, 0.0, 1.0,
+      0.5, -0.5, 0.0,   0.8, 1.0, 0.7
 ];
