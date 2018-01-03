@@ -24,15 +24,6 @@ function start(){
     // we'll be drawing.
     initBuffers();
 
-    // Set up to draw the scene periodically every 15ms.
-    // Set up to draw the scene periodically.
-    // setInterval(function() {
-    //     // requestAnimationFrame(animate);
-    //     renderGame();
-    // }, 15);
-
-    // requestAnimationFrame(renderGame);
-    // renderGame();
     tick();
 }
 
@@ -41,6 +32,19 @@ function setMatrixUniforms() {
     gl.uniformMatrix4fv(shaderProgram.worldMatrixUniform, false, worldMatrix);
     gl.uniformMatrix4fv(shaderProgram.viewMatrixUniform, false, viewMatrix);
 
+}
+
+function mvPushMatrix() {
+    let copy = mat4.create();
+    mat4.set(viewMatrix, copy);
+    viewMatrixStack.push(copy);
+}
+
+function mvPopMatrix() {
+    if (viewMatrixStack.length === 0) {
+        throw "Invalid popMatrix!";
+    }
+    viewMatrix = viewMatrixStack.pop();
 }
 
 function initGl(canvas){
@@ -154,6 +158,8 @@ function renderGame() {
 
     // Set the drawing position to the "identity" point, which is
     // the center of the scene.
+    mvPushMatrix();
+
     mat4.identity(worldMatrix);
     mat4.lookAt(viewMatrix, [0, 0, -2], [0, 0, 0], [0, 1, 0]);
     // Establish the perspective with which we want to view the
@@ -161,10 +167,14 @@ function renderGame() {
     // ratio and we only want to see objects between 0.1 units
     // and 1000 units away from the camera.
     mat4.perspective(projMatrix, glMatrix.toRadian(45), gl.viewportWidth / gl.viewportHeight, 0.1, 1000.0);
+    mat4.rotate(worldMatrix, mat4.create(), angle, [0, 1, 0]);
 
+    // updating matrices
     setMatrixUniforms();
+
     // rišem trikotnik, 0 točk prekosčim, 3 točke narišem
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    mvPopMatrix();
 
     i++;
     console.log(i);
@@ -173,7 +183,7 @@ function renderGame() {
 function animate() {
     timeNow = new Date().getTime();
     if (lastTime !== 0) {
-        angle += (90 * timeNow - lastTime) / 1000.0;
+        angle += (Math.PI * (timeNow - lastTime) * 2) / 1000.0 / 6;
     }
     lastTime = timeNow;
 }
@@ -197,6 +207,7 @@ let gl; // webgl content
 let worldMatrix = mat4.create(); // matrika sveta
 let projMatrix = mat4.create(); // projekcijska matrika
 let viewMatrix = mat4.create(); // matrika pogleda
+let viewMatrixStack = [];
 
 // kot obračanja, spremenljivke za računanje
 let angle = 0;
