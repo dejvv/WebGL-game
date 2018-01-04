@@ -291,7 +291,7 @@ function renderGame() {
 
     mat4.perspective(projMatrix, glMatrix.toRadian(45), gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
     mat4.identity(viewMatrix);
-    // mat4.identity(worldMatrix);
+   // mat4.identity(worldMatrix);
 
 
     // premikanje
@@ -576,6 +576,7 @@ function handleKeys() {
     if (currentlyPressedKeys[37] || currentlyPressedKeys[65]) {
         // Left cursor key or A
         yawRate = 0.1;
+
     } else if (currentlyPressedKeys[39] || currentlyPressedKeys[68]) {
         // Right cursor key or D
         yawRate = -0.1;
@@ -585,12 +586,44 @@ function handleKeys() {
 
     if (currentlyPressedKeys[38] || currentlyPressedKeys[87]) {
         // Up cursor key or W
-        speed = 0.003;
+        if (checkPos()) {
+            speed = 0.003;
+        }
     } else if (currentlyPressedKeys[40] || currentlyPressedKeys[83]) {
         // Down cursor key
-        speed = -0.003;
+        if (checkPos()) {
+            speed = -0.003;
+        }
     } else {
         speed = 0;
+    }
+
+    if (currentlyPressedKeys[70]){
+        /*
+
+        TU BO ZA SPAWN IN PREMIK BURGERJA
+         */
+    }
+}
+
+function checkPos() {
+    if (xPosition > 17){
+        xPosition = xPosition-0.25;
+        return false;
+    }
+    else if(xPosition < -17){
+        xPosition = xPosition+0.25;
+        return false;
+    }
+    else if (zPosition > 17){
+        zPosition = zPosition-0.25;
+        return false;
+    }
+    else if (zPosition < -17){
+        zPosition = zPosition+0.25;
+        return false;
+    }else{
+        return true;
     }
 }
 
