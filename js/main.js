@@ -19,9 +19,7 @@ function start() {
     // Initialize the shaders; this is where all the lighting for the
     // vertices and so forth is established.
     initShaders();
-
-    // Here's where we call the routine that builds all the objects
-    // we'll be drawing.
+    initBuffers();
     initTextures();
     loadWorld();
 
@@ -29,27 +27,16 @@ function start() {
     document.onkeyup = handleKeyUp;
 
     requestAnimationFrame(tick);
-    // Set up to draw the scene periodically.
-    // setInterval(function() {
-    //     if (texturesLoaded) { // only draw scene and animate when textures are loaded.
-    //         requestAnimationFrame(animate);
-    //         handleKeys();
-    //         renderGame();
-    //     }
-    // }, 15);
 }
 
 function setMatrixUniforms() {
     gl.uniformMatrix4fv(shaderProgram.projMatrixUniform, false, projMatrix);
-    // gl.uniformMatrix4fv(shaderProgram.worldMatrixUniform, false, worldMatrix);
+    gl.uniformMatrix4fv(shaderProgram.worldMatrixUniform, false, worldMatrix);
     gl.uniformMatrix4fv(shaderProgram.viewMatrixUniform, false, viewMatrix);
-
 }
 
 function mvPushMatrix() {
-    let copy = mat4.create();
-    mat4.set(viewMatrix, copy);
-    viewMatrixStack.push(copy);
+    viewMatrixStack.push(mat4.copy(mat4.create(), viewMatrix));
 }
 
 function mvPopMatrix() {
@@ -60,28 +47,44 @@ function mvPopMatrix() {
 }
 
 function initTextures() {
-    wallTexture = gl.createTexture();
-    wallTexture.image = new Image();
-    wallTexture.image.onload = function () {
-        handleTextureLoaded(wallTexture)
-    }
-    wallTexture.image.src = "./assets/wall.png";
+    boxTexture = gl.createTexture();
+    boxTexture.image = new Image();
+    boxTexture.image.onload = function () {
+        handleTextureLoaded(boxTexture);
+    };
+    boxTexture.image.src = "./assets/wall.png";
+
+    groundTexture = gl.createTexture();
+    groundTexture.image = new Image();
+    groundTexture.image.onload = function () {
+        handleTextureLoaded(groundTexture);
+    };
+    groundTexture.image.src = "./assets/grass.png";
+
+    heheTexture = gl.createTexture();
+    heheTexture.image = new Image();
+    heheTexture.image.onload = function () {
+        handleTextureLoaded(heheTexture);
+    };
+    heheTexture.image.src = "./assets/test.png";
 }
 
 function handleTextureLoaded(texture) {
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
-    // Third texture usus Linear interpolation approximation with nearest Mipmap selection
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture.image);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.generateMipmap(gl.TEXTURE_2D);
-
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texImage2D(
+        gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        texture.image
+    );
     gl.bindTexture(gl.TEXTURE_2D, null);
-
     // when texture loading is finished we can draw scene.
-    texturesLoaded = true;
+    texturesLoaded++;
 }
 
 function handleLoadedWorld(data) {
@@ -125,7 +128,7 @@ function loadWorld() {
         if (request.readyState == 4) {
             handleLoadedWorld(request.responseText);
         }
-    }
+    };
     request.send();
 }
 
@@ -146,7 +149,6 @@ function initGl(canvas) {
     return gl;
 }
 
-// gl - webgl context
 // shaderType - kakšen shader funkcija vrne
 // shaderText - body shaderja, njegova vsebina
 function createShader(shaderType, shaderText) {
@@ -169,8 +171,8 @@ function createShader(shaderType, shaderText) {
 }
 
 function initShaders() {
-    fragmentShader = createShader("fragmentShader", fragmentShaderDoom);
-    vertexShader = createShader("vertexShader", vertexShaderDoom);
+    fragmentShader = createShader("fragmentShader", fragmentShaderText);
+    vertexShader = createShader("vertexShader", vertexShaderText);
 
     // naredim program
     shaderProgram = gl.createProgram();
@@ -192,122 +194,118 @@ function initShaders() {
     gl.useProgram(shaderProgram);
     // kje se nahaja v shaderju attribut, njegova lokacija
 
-    shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
-    shaderProgram.textureCoordAttribute = gl.getAttribLocation(shaderProgram, "aTextureCoord");
+    shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "vertPosition");
+    shaderProgram.textureCoordAttribute = gl.getAttribLocation(shaderProgram, "vertTexCoord");
     gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
     gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
 
 
     shaderProgram.projMatrixUniform = gl.getUniformLocation(shaderProgram, "mProj");
-    // shaderProgram.worldMatrixUniform = gl.getUniformLocation(shaderProgram, "mWorld");
+    shaderProgram.worldMatrixUniform = gl.getUniformLocation(shaderProgram, "mWorld");
     shaderProgram.viewMatrixUniform = gl.getUniformLocation(shaderProgram, "mView");
     // store location of uSampler variable defined in shader
-    shaderProgram.samplerUniform = gl.getUniformLocation(shaderProgram, "uSampler");
+    shaderProgram.samplerUniform = gl.getUniformLocation(shaderProgram, "sampler");
 
 }
 
 function initBuffers() {
-    // buffers are chunk of memory
-    // uporablja vedno zadnji ustvarjeni buffer
-    // javascript uporablja 64 bitne float numbers, webgl rabi 32 bitna stevila
+    // enka
+    box1VertexBufferObject = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, box1VertexBufferObject);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(box1Vertices), gl.STATIC_DRAW);
 
-    let triangleBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, triangleBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangleVertices), gl.STATIC_DRAW);
+    box1IndexBufferObject = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, box1IndexBufferObject);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(box1Indices), gl.STATIC_DRAW);
 
+    // dvojka
+    box2VertexBufferObject = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, box2VertexBufferObject);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(box2Vertices), gl.STATIC_DRAW);
 
-    gl.vertexAttribPointer(
-        shaderProgram.positionAttribLocation, // lokacija tega atributa
-        3, // stevilo elementov na atribut
-        gl.FLOAT, // tip podatkov
-        gl.FALSE, // ali so podatki normalizirani
-        6 * Float32Array.BYTES_PER_ELEMENT,// velikost posamezne tocke
-        0 // "offset", torej ali imam še kakšne podatke v tem arrayu, za koliko se naj odmaknem, da najdem prave
-    );
-
-    gl.vertexAttribPointer(
-        shaderProgram.colorAttribLocation, // lokacija tega atributa
-        3, // stevilo elementov na atribut
-        gl.FLOAT, // tip podatkov
-        gl.FALSE, // ali so podatki normalizirani
-        6 * Float32Array.BYTES_PER_ELEMENT,// velikost posamezne tocke
-        3 * Float32Array.BYTES_PER_ELEMENT// "offset", torej ali imam še kakšne podatke v tem arrayu, za koliko se naj odmaknem, da najdem prave
-    );
-
-
+    box2IndexBufferObject = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, box2IndexBufferObject);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(box2Indices), gl.STATIC_DRAW);
 }
 
+/**
+ * pred vsakim risanje potrebno shraniti view matriko z mvPushMatrix() in jo potem restorati z mvPopMatrix
+ */
 function renderGame() {
     // set the rendering environment to full canvas size
     gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
     // Clear the canvas before we start drawing on it.
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    if (worldVertexTextureCoordBuffer == null || worldVertexPositionBuffer == null) {
-        return;
-    }
-    // Set the drawing position to the "identity" point, which is
-    // the center of the scene.
-    // mvPushMatrix();
-
-    // mat4.lookAt(viewMatrix, [0, 0, -5], [0, 0, 0], [0, 1, 0]);
-    // Establish the perspective with which we want to view the
-    // scene. Our field of view is 45 degrees, with a width/height
-    // ratio and we only want to see objects between 0.1 units
-    // and 1000 units away from the camera.
     mat4.perspective(projMatrix, glMatrix.toRadian(45), gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
     mat4.identity(viewMatrix);
 
+    // premikanje
     mat4.rotate(viewMatrix, viewMatrix, glMatrix.toRadian(-pitch), [1, 0, 0]);
     mat4.rotate(viewMatrix, viewMatrix, glMatrix.toRadian(-yaw), [0, 1, 0]);
     mat4.translate(viewMatrix, viewMatrix, [-xPosition, -yPosition, -zPosition]);
 
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, wallTexture);
-    gl.uniform1i(shaderProgram.samplerUniform, 0);
-
+    // // rišem world
+    mvPushMatrix();
     gl.bindBuffer(gl.ARRAY_BUFFER, worldVertexTextureCoordBuffer);
-    gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, worldVertexTextureCoordBuffer.itemSize, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, worldVertexTextureCoordBuffer.itemSize, gl.FLOAT, gl.FALSE, 0, 0);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, worldVertexPositionBuffer);
-    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, worldVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, worldVertexPositionBuffer.itemSize, gl.FLOAT, gl.FALSE, 0, 0);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, groundTexture);
+    gl.uniform1i(shaderProgram.samplerUniform, 0);
 
     setMatrixUniforms();
     gl.drawArrays(gl.TRIANGLES, 0, worldVertexPositionBuffer.numItems);
+    mvPopMatrix();
+
+    // // rišem 1. kvadrat
+    // narišem ga malo levo od mene, gledam v [0,0,0] torej čisto v center
+    mvPushMatrix();
+    mat4.translate(viewMatrix, viewMatrix, [-1.5, 1.0, -7.0]);
+    gl.bindBuffer(gl.ARRAY_BUFFER, box1VertexBufferObject);
+    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 5 * Float32Array.BYTES_PER_ELEMENT, 0);
+    gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 5 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, boxTexture);
+    gl.uniform1i(shaderProgram.samplerUniform, 0);
+
+   // gl.bindBuffer(gl.ARRAY_BUFFER, box1IndexBufferObject);
+    setMatrixUniforms(); // čistka matrike
+    gl.drawElements(gl.TRIANGLES, box1Indices.length, gl.UNSIGNED_SHORT, 0);
+    mvPopMatrix();
+
+    // // rišem 2. kvadrat
+    // narišem ga malo desno od mene, gledam v [0,0,0] torej čisto v center
+    mvPushMatrix();
+    mat4.translate(viewMatrix, viewMatrix, [1.5, 1.0, -7.0]);
+    gl.bindBuffer(gl.ARRAY_BUFFER, box2VertexBufferObject);
+    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 5 * Float32Array.BYTES_PER_ELEMENT, 0);
+    gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 5 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, heheTexture);
+    gl.uniform1i(shaderProgram.samplerUniform, 0);
+
+    //gl.bindBuffer(gl.ARRAY_BUFFER, box2IndexBufferObject);
+    setMatrixUniforms(); // čistka matrike
+    gl.drawElements(gl.TRIANGLES, box2Indices.length, gl.UNSIGNED_SHORT, 0);
+    mvPopMatrix();
 
     // // updating matrices
     // setMatrixUniforms();
     //
     // // rišem trikotnik, 0 točk prekosčim, 3 točke narišem
     // gl.drawArrays(gl.TRIANGLES, 0, 3);
-    // mvPopMatrix();
-
-    i++;
-    console.log(i);
+    //mvPopMatrix();
 }
 
-// function animate() {
-//     timeNow = new Date().getTime();
-//     if (lastTime !== 0) {
-//         angle += (Math.PI * (timeNow - lastTime) * 2) / 1000.0 / 6;
-//     }
-//     lastTime = timeNow;
-// }
-
-// function animate(time) {
-//     time /= 1000;
-//     if (speed != 0) {
-//         xPosition -= Math.sin(glMatrix.toRadian(yaw)) * speed * time;
-//         zPosition -= Math.cos(glMatrix.toRadian(yaw)) * speed * time;
-//
-//         joggingAngle += time * 0.6; // 0.6 "fiddle factor" - makes it feel more realistic :-)
-//         yPosition = Math.sin(glMatrix.toRadian(joggingAngle)) / 20 + 0.4
-//     }
-//     yaw += yawRate * time;
-//     pitch += pitchRate * time;
-//
-// }
-
+/**
+ *Funkcija glede na čas izračuna premikanje
+ */
 function animate() {
     timeNow = new Date().getTime();
     if (lastTime != 0) {
@@ -330,10 +328,13 @@ function animate() {
 
 // Samo za animacijo
 function tick(time) {
-    if (texturesLoaded) { // only draw scene and animate when textures are loaded.
+    if (texturesLoaded === 3) { // only draw scene and animate when textures are loaded.
         animate(time);
         handleKeys();
         renderGame();
+    }
+    else{
+        console.log("Textures loading, loaded:", texturesLoaded);
     }
     requestAnimationFrame(tick);
 
@@ -350,6 +351,11 @@ let gl; // webgl content
 // Buffers
 var worldVertexPositionBuffer = null;
 var worldVertexTextureCoordBuffer = null;
+let box1VertexBufferObject;
+let box1IndexBufferObject;
+let box2VertexBufferObject;
+let box2IndexBufferObject;
+
 
 // matrike
 let worldMatrix = mat4.create(); // matrika sveta
@@ -358,7 +364,6 @@ let viewMatrix = mat4.create(); // matrika pogleda
 let viewMatrixStack = [];
 
 // kot obračanja, spremenljivke za računanje
-let angle = 0;
 let lastTime = 0;
 let timeNow;
 
@@ -376,54 +381,60 @@ let zPosition = 0;
 let speed = 0;
 
 // Variables for storing textures
-let wallTexture;
+let boxTexture;
+let groundTexture;
+let heheTexture;
+let susanTexture;
 
 // Variable that stores  loading state of textures.
-let texturesLoaded = false;
+let texturesLoaded = 0;
 
 // Keyboard handling helper variable for reading the status of keys
 let currentlyPressedKeys = {};
 
 const vertexShaderText = [
-    'precision mediump float;',
-    '',
-    'attribute vec3 vertPosition;',
-    'attribute vec3 vertColor;',
-    'varying vec3 fragColor;',
-    'uniform mat4 mWorld;',
-    'uniform mat4 mView;',
-    'uniform mat4 mProj;',
-    '',
-    'void main()',
-    '{',
-    '  fragColor = vertColor;',
-    '  gl_Position = mProj * mView * mWorld * vec4(vertPosition, 1.0);',
-    '}'
+        'precision mediump float;',
+        '',
+        'attribute vec3 vertPosition;',
+        'attribute vec2 vertTexCoord;',
+        'varying vec2 fragTexCoord;',
+        'uniform mat4 mWorld;',
+        'uniform mat4 mView;',
+        'uniform mat4 mProj;',
+        '',
+        'void main()',
+        '{',
+        '  fragTexCoord = vertTexCoord;',
+        '  gl_Position = mProj * mView * mWorld * vec4(vertPosition, 1.0);',
+        '}'
 ].join('\n');
 
 const fragmentShaderText = [
-    'precision mediump float;',
-    '',
-    'varying vec3 fragColor;',
-    'void main()',
-    '{',
-    '  gl_FragColor = vec4(fragColor, 1.0);',
-    '}'
+        'precision mediump float;',
+        '',
+        'varying vec2 fragTexCoord;',
+        'uniform sampler2D sampler;',
+        '',
+        'void main()',
+        '{',
+        '  gl_FragColor = texture2D(sampler, fragTexCoord);',
+        '}'
 ].join('\n');
 
 let triangleVertices = [
-    // X,    Y,   Z,     R,   G,   B
-    0.0, 0.5, 0.0, 1.0, 0.8, 0.3,
-    -0.5, -0.5, 0.0, 0.7, 0.0, 1.0,
-    0.5, -0.5, 0.0, 0.8, 1.0, 0.7
+    // X,    Y,   Z,     U, v
+    0.0,  1.0,  0.0,
+    -1.0, -1.0,  0.0,
+    1.0, -1.0,  0.0
 ];
 
+// ni pomembno trenutno
 const vertexShaderDoom = [
     'precision mediump float;',
     '',
     'attribute vec3 aVertexPosition;',
     'attribute vec2 aTextureCoord;',
-    '',
+    'varying ',
     'uniform mat4 mView;',
     'uniform mat4 mProj;',
 
@@ -450,22 +461,6 @@ const fragmentShaderDoom = [
     ' gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));',
     '}'
 ].join('\n');
-
-//
-// Keyboard handling helper functions
-//
-// handleKeyDown    ... called on keyDown event
-// handleKeyUp      ... called on keyUp event
-//
-function handleKeyDown(event) {
-    // storing the pressed state for individual key
-    currentlyPressedKeys[event.keyCode] = true;
-}
-
-function handleKeyUp(event) {
-    // reseting the pressed state for individual key
-    currentlyPressedKeys[event.keyCode] = false;
-}
 
 //
 // Keyboard handling helper functions
@@ -520,3 +515,138 @@ function handleKeys() {
         speed = 0;
     }
 }
+
+//
+// Create buffer
+//
+var box1Vertices =
+    [ // X, Y, Z           U, V
+        // Top
+        -1.0, 1.0, -1.0,   0, 0,
+        -1.0, 1.0, 1.0,    0, 1,
+        1.0, 1.0, 1.0,     1, 1,
+        1.0, 1.0, -1.0,    1, 0,
+
+        // Left
+        -1.0, 1.0, 1.0,    0, 0,
+        -1.0, -1.0, 1.0,   1, 0,
+        -1.0, -1.0, -1.0,  1, 1,
+        -1.0, 1.0, -1.0,   0, 1,
+
+        // Right
+        1.0, 1.0, 1.0,    1, 1,
+        1.0, -1.0, 1.0,   0, 1,
+        1.0, -1.0, -1.0,  0, 0,
+        1.0, 1.0, -1.0,   1, 0,
+
+        // Front
+        1.0, 1.0, 1.0,    1, 1,
+        1.0, -1.0, 1.0,    1, 0,
+        -1.0, -1.0, 1.0,    0, 0,
+        -1.0, 1.0, 1.0,    0, 1,
+
+        // Back
+        1.0, 1.0, -1.0,    0, 0,
+        1.0, -1.0, -1.0,    0, 1,
+        -1.0, -1.0, -1.0,    1, 1,
+        -1.0, 1.0, -1.0,    1, 0,
+
+        // Bottom
+        -1.0, -1.0, -1.0,   1, 1,
+        -1.0, -1.0, 1.0,    1, 0,
+        1.0, -1.0, 1.0,     0, 0,
+        1.0, -1.0, -1.0,    0, 1,
+    ];
+
+var box1Indices =
+    [
+        // Top
+        0, 1, 2,
+        0, 2, 3,
+
+        // Left
+        5, 4, 6,
+        6, 4, 7,
+
+        // Right
+        8, 9, 10,
+        8, 10, 11,
+
+        // Front
+        13, 12, 14,
+        15, 14, 12,
+
+        // Back
+        16, 17, 18,
+        16, 18, 19,
+
+        // Bottom
+        21, 20, 22,
+        22, 20, 23
+    ];
+
+var box2Vertices =
+    [ // X, Y, Z           U, V
+        // Top
+        -1.0, 1.0, -1.0,   0, 0,
+        -1.0, 1.0, 1.0,    0, 1,
+        1.0, 1.0, 1.0,     1, 1,
+        1.0, 1.0, -1.0,    1, 0,
+
+        // Left
+        -1.0, 1.0, 1.0,    0, 0,
+        -1.0, -1.0, 1.0,   1, 0,
+        -1.0, -1.0, -1.0,  1, 1,
+        -1.0, 1.0, -1.0,   0, 1,
+
+        // Right
+        1.0, 1.0, 1.0,    1, 1,
+        1.0, -1.0, 1.0,   0, 1,
+        1.0, -1.0, -1.0,  0, 0,
+        1.0, 1.0, -1.0,   1, 0,
+
+        // Front
+        1.0, 1.0, 1.0,    1, 1,
+        1.0, -1.0, 1.0,    1, 0,
+        -1.0, -1.0, 1.0,    0, 0,
+        -1.0, 1.0, 1.0,    0, 1,
+
+        // Back
+        1.0, 1.0, -1.0,    0, 0,
+        1.0, -1.0, -1.0,    0, 1,
+        -1.0, -1.0, -1.0,    1, 1,
+        -1.0, 1.0, -1.0,    1, 0,
+
+        // Bottom
+        -1.0, -1.0, -1.0,   1, 1,
+        -1.0, -1.0, 1.0,    1, 0,
+        1.0, -1.0, 1.0,     0, 0,
+        1.0, -1.0, -1.0,    0, 1,
+    ];
+
+var box2Indices =
+    [
+        // Top
+        0, 1, 2,
+        0, 2, 3,
+
+        // Left
+        5, 4, 6,
+        6, 4, 7,
+
+        // Right
+        8, 9, 10,
+        8, 10, 11,
+
+        // Front
+        13, 12, 14,
+        15, 14, 12,
+
+        // Back
+        16, 17, 18,
+        16, 18, 19,
+
+        // Bottom
+        21, 20, 22,
+        22, 20, 23
+    ];
