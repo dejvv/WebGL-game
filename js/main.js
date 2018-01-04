@@ -18,16 +18,46 @@ function start() {
 
     // Initialize the shaders; this is where all the lighting for the
     // vertices and so forth is established.
-    initShaders();
-    initBuffers();
-    initTextures();
-    loadWorld();
 
-    document.onkeydown = handleKeyDown;
-    document.onkeyup = handleKeyUp;
+    loadExternalModel()
+        .then(() => {
+            initShaders();
+            initBuffers();
+            initTextures();
+            loadWorld();
 
-    requestAnimationFrame(tick);
+            document.onkeydown = handleKeyDown;
+            document.onkeyup = handleKeyUp;
+
+            requestAnimationFrame(tick);
+        })
+
 }
+
+function loadExternalModel() {
+    return new Promise((resolve, reject) => {
+        loadJSONResource('./assets/Susan.json', function (modelErr, modelObj) {
+            if (modelErr) {
+                alert('Fatal error getting Susan model (see console)');
+                console.error("[JSON model] ", fsErr);
+                reject(fsErr);
+            } else {
+                console.log("[JSON model] successfuly loaded:", modelObj);
+                susanObject = modelObj;
+                susanVertices = susanObject.meshes[0].vertices;
+                susanIndices = [].concat.apply([], susanObject.meshes[0].faces);
+                susanTexCoords = susanObject.meshes[0].texturecoords[0];
+                resolve();
+            }
+        });
+    })
+
+}
+
+let susanObject;
+let susanVertices;
+let susanIndices;
+let susanTexCoords;
 
 function setMatrixUniforms() {
     gl.uniformMatrix4fv(shaderProgram.projMatrixUniform, false, projMatrix);
@@ -67,6 +97,14 @@ function initTextures() {
         handleTextureLoaded(heheTexture);
     };
     heheTexture.image.src = "./assets/test.png";
+
+    susanTexture = gl.createTexture();
+    susanTexture.image = new Image();
+    susanTexture.image.onload = function () {
+        handleTextureLoaded(susanTexture);
+    };
+    susanTexture.image.src = "./assets/SusanTexture.png";
+
 }
 
 function handleTextureLoaded(texture) {
@@ -226,6 +264,20 @@ function initBuffers() {
     box2IndexBufferObject = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, box2IndexBufferObject);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(box2Indices), gl.STATIC_DRAW);
+
+    // susan
+    susanVertexPositionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, susanVertexPositionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(susanVertices), gl.STATIC_DRAW);
+
+    susanVertexTextureCoordBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, susanVertexTextureCoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(susanTexCoords), gl.STATIC_DRAW);
+
+    susanVertexIndexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, susanVertexIndexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(susanIndices), gl.STATIC_DRAW);
+
 }
 
 /**
@@ -239,6 +291,8 @@ function renderGame() {
 
     mat4.perspective(projMatrix, glMatrix.toRadian(45), gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
     mat4.identity(viewMatrix);
+    // mat4.identity(worldMatrix);
+
 
     // premikanje
     mat4.rotate(viewMatrix, viewMatrix, glMatrix.toRadian(-pitch), [1, 0, 0]);
@@ -261,6 +315,26 @@ function renderGame() {
     gl.drawArrays(gl.TRIANGLES, 0, worldVertexPositionBuffer.numItems);
     mvPopMatrix();
 
+    // // rišem susan
+    mvPushMatrix();
+    mat4.translate(viewMatrix, viewMatrix, [-3, 2.0, -7.0]);
+    gl.bindBuffer(gl.ARRAY_BUFFER, susanVertexPositionBuffer);
+    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+    // gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, susanVertexTextureCoordBuffer);
+    gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 2 * Float32Array.BYTES_PER_ELEMENT, 0);
+    // gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, susanTexture);
+    gl.uniform1i(shaderProgram.samplerUniform, 0);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, susanVertexIndexBuffer);
+    setMatrixUniforms();
+    gl.drawElements(gl.TRIANGLES, susanIndices.length, gl.UNSIGNED_SHORT, 0);
+    mvPopMatrix();
+
     // // rišem 1. kvadrat
     // narišem ga malo levo od mene, gledam v [0,0,0] torej čisto v center
     mvPushMatrix();
@@ -273,7 +347,7 @@ function renderGame() {
     gl.bindTexture(gl.TEXTURE_2D, boxTexture);
     gl.uniform1i(shaderProgram.samplerUniform, 0);
 
-   // gl.bindBuffer(gl.ARRAY_BUFFER, box1IndexBufferObject);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, box1IndexBufferObject);
     setMatrixUniforms(); // čistka matrike
     gl.drawElements(gl.TRIANGLES, box1Indices.length, gl.UNSIGNED_SHORT, 0);
     mvPopMatrix();
@@ -290,7 +364,7 @@ function renderGame() {
     gl.bindTexture(gl.TEXTURE_2D, heheTexture);
     gl.uniform1i(shaderProgram.samplerUniform, 0);
 
-    //gl.bindBuffer(gl.ARRAY_BUFFER, box2IndexBufferObject);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, box2IndexBufferObject);
     setMatrixUniforms(); // čistka matrike
     gl.drawElements(gl.TRIANGLES, box2Indices.length, gl.UNSIGNED_SHORT, 0);
     mvPopMatrix();
@@ -328,12 +402,12 @@ function animate() {
 
 // Samo za animacijo
 function tick(time) {
-    if (texturesLoaded === 3) { // only draw scene and animate when textures are loaded.
+    if (texturesLoaded === 4) { // only draw scene and animate when textures are loaded.
         animate(time);
         handleKeys();
         renderGame();
     }
-    else{
+    else {
         console.log("Textures loading, loaded:", texturesLoaded);
     }
     requestAnimationFrame(tick);
@@ -349,12 +423,16 @@ let canvas; // canvas
 let gl; // webgl content
 
 // Buffers
-var worldVertexPositionBuffer = null;
-var worldVertexTextureCoordBuffer = null;
+let worldVertexPositionBuffer = null;
+let worldVertexTextureCoordBuffer = null;
 let box1VertexBufferObject;
 let box1IndexBufferObject;
 let box2VertexBufferObject;
 let box2IndexBufferObject;
+
+let susanVertexPositionBuffer;
+let susanVertexTextureCoordBuffer;
+let susanVertexIndexBuffer;
 
 
 // matrike
@@ -393,39 +471,39 @@ let texturesLoaded = 0;
 let currentlyPressedKeys = {};
 
 const vertexShaderText = [
-        'precision mediump float;',
-        '',
-        'attribute vec3 vertPosition;',
-        'attribute vec2 vertTexCoord;',
-        'varying vec2 fragTexCoord;',
-        'uniform mat4 mWorld;',
-        'uniform mat4 mView;',
-        'uniform mat4 mProj;',
-        '',
-        'void main()',
-        '{',
-        '  fragTexCoord = vertTexCoord;',
-        '  gl_Position = mProj * mView * mWorld * vec4(vertPosition, 1.0);',
-        '}'
+    'precision mediump float;',
+    '',
+    'attribute vec3 vertPosition;',
+    'attribute vec2 vertTexCoord;',
+    'varying vec2 fragTexCoord;',
+    'uniform mat4 mWorld;',
+    'uniform mat4 mView;',
+    'uniform mat4 mProj;',
+    '',
+    'void main()',
+    '{',
+    '  fragTexCoord = vertTexCoord;',
+    '  gl_Position = mProj * mView * mWorld * vec4(vertPosition, 1.0);',
+    '}'
 ].join('\n');
 
 const fragmentShaderText = [
-        'precision mediump float;',
-        '',
-        'varying vec2 fragTexCoord;',
-        'uniform sampler2D sampler;',
-        '',
-        'void main()',
-        '{',
-        '  gl_FragColor = texture2D(sampler, fragTexCoord);',
-        '}'
+    'precision mediump float;',
+    '',
+    'varying vec2 fragTexCoord;',
+    'uniform sampler2D sampler;',
+    '',
+    'void main()',
+    '{',
+    '  gl_FragColor = texture2D(sampler, fragTexCoord);',
+    '}'
 ].join('\n');
 
 let triangleVertices = [
     // X,    Y,   Z,     U, v
-    0.0,  1.0,  0.0,
-    -1.0, -1.0,  0.0,
-    1.0, -1.0,  0.0
+    0.0, 1.0, 0.0,
+    -1.0, -1.0, 0.0,
+    1.0, -1.0, 0.0
 ];
 
 // ni pomembno trenutno
@@ -522,40 +600,40 @@ function handleKeys() {
 var box1Vertices =
     [ // X, Y, Z           U, V
         // Top
-        -1.0, 1.0, -1.0,   0, 0,
-        -1.0, 1.0, 1.0,    0, 1,
-        1.0, 1.0, 1.0,     1, 1,
-        1.0, 1.0, -1.0,    1, 0,
+        -1.0, 1.0, -1.0, 0, 0,
+        -1.0, 1.0, 1.0, 0, 1,
+        1.0, 1.0, 1.0, 1, 1,
+        1.0, 1.0, -1.0, 1, 0,
 
         // Left
-        -1.0, 1.0, 1.0,    0, 0,
-        -1.0, -1.0, 1.0,   1, 0,
-        -1.0, -1.0, -1.0,  1, 1,
-        -1.0, 1.0, -1.0,   0, 1,
+        -1.0, 1.0, 1.0, 0, 0,
+        -1.0, -1.0, 1.0, 1, 0,
+        -1.0, -1.0, -1.0, 1, 1,
+        -1.0, 1.0, -1.0, 0, 1,
 
         // Right
-        1.0, 1.0, 1.0,    1, 1,
-        1.0, -1.0, 1.0,   0, 1,
-        1.0, -1.0, -1.0,  0, 0,
-        1.0, 1.0, -1.0,   1, 0,
+        1.0, 1.0, 1.0, 1, 1,
+        1.0, -1.0, 1.0, 0, 1,
+        1.0, -1.0, -1.0, 0, 0,
+        1.0, 1.0, -1.0, 1, 0,
 
         // Front
-        1.0, 1.0, 1.0,    1, 1,
-        1.0, -1.0, 1.0,    1, 0,
-        -1.0, -1.0, 1.0,    0, 0,
-        -1.0, 1.0, 1.0,    0, 1,
+        1.0, 1.0, 1.0, 1, 1,
+        1.0, -1.0, 1.0, 1, 0,
+        -1.0, -1.0, 1.0, 0, 0,
+        -1.0, 1.0, 1.0, 0, 1,
 
         // Back
-        1.0, 1.0, -1.0,    0, 0,
-        1.0, -1.0, -1.0,    0, 1,
-        -1.0, -1.0, -1.0,    1, 1,
-        -1.0, 1.0, -1.0,    1, 0,
+        1.0, 1.0, -1.0, 0, 0,
+        1.0, -1.0, -1.0, 0, 1,
+        -1.0, -1.0, -1.0, 1, 1,
+        -1.0, 1.0, -1.0, 1, 0,
 
         // Bottom
-        -1.0, -1.0, -1.0,   1, 1,
-        -1.0, -1.0, 1.0,    1, 0,
-        1.0, -1.0, 1.0,     0, 0,
-        1.0, -1.0, -1.0,    0, 1,
+        -1.0, -1.0, -1.0, 1, 1,
+        -1.0, -1.0, 1.0, 1, 0,
+        1.0, -1.0, 1.0, 0, 0,
+        1.0, -1.0, -1.0, 0, 1,
     ];
 
 var box1Indices =
@@ -588,40 +666,40 @@ var box1Indices =
 var box2Vertices =
     [ // X, Y, Z           U, V
         // Top
-        -1.0, 1.0, -1.0,   0, 0,
-        -1.0, 1.0, 1.0,    0, 1,
-        1.0, 1.0, 1.0,     1, 1,
-        1.0, 1.0, -1.0,    1, 0,
+        -1.0, 1.0, -1.0, 0, 0,
+        -1.0, 1.0, 1.0, 0, 1,
+        1.0, 1.0, 1.0, 1, 1,
+        1.0, 1.0, -1.0, 1, 0,
 
         // Left
-        -1.0, 1.0, 1.0,    0, 0,
-        -1.0, -1.0, 1.0,   1, 0,
-        -1.0, -1.0, -1.0,  1, 1,
-        -1.0, 1.0, -1.0,   0, 1,
+        -1.0, 1.0, 1.0, 0, 0,
+        -1.0, -1.0, 1.0, 1, 0,
+        -1.0, -1.0, -1.0, 1, 1,
+        -1.0, 1.0, -1.0, 0, 1,
 
         // Right
-        1.0, 1.0, 1.0,    1, 1,
-        1.0, -1.0, 1.0,   0, 1,
-        1.0, -1.0, -1.0,  0, 0,
-        1.0, 1.0, -1.0,   1, 0,
+        1.0, 1.0, 1.0, 1, 1,
+        1.0, -1.0, 1.0, 0, 1,
+        1.0, -1.0, -1.0, 0, 0,
+        1.0, 1.0, -1.0, 1, 0,
 
         // Front
-        1.0, 1.0, 1.0,    1, 1,
-        1.0, -1.0, 1.0,    1, 0,
-        -1.0, -1.0, 1.0,    0, 0,
-        -1.0, 1.0, 1.0,    0, 1,
+        1.0, 1.0, 1.0, 1, 1,
+        1.0, -1.0, 1.0, 1, 0,
+        -1.0, -1.0, 1.0, 0, 0,
+        -1.0, 1.0, 1.0, 0, 1,
 
         // Back
-        1.0, 1.0, -1.0,    0, 0,
-        1.0, -1.0, -1.0,    0, 1,
-        -1.0, -1.0, -1.0,    1, 1,
-        -1.0, 1.0, -1.0,    1, 0,
+        1.0, 1.0, -1.0, 0, 0,
+        1.0, -1.0, -1.0, 0, 1,
+        -1.0, -1.0, -1.0, 1, 1,
+        -1.0, 1.0, -1.0, 1, 0,
 
         // Bottom
-        -1.0, -1.0, -1.0,   1, 1,
-        -1.0, -1.0, 1.0,    1, 0,
-        1.0, -1.0, 1.0,     0, 0,
-        1.0, -1.0, -1.0,    0, 1,
+        -1.0, -1.0, -1.0, 1, 1,
+        -1.0, -1.0, 1.0, 1, 0,
+        1.0, -1.0, 1.0, 0, 0,
+        1.0, -1.0, -1.0, 0, 1,
     ];
 
 var box2Indices =
