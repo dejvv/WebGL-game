@@ -414,7 +414,6 @@ function renderGame(now) {
     gl.bindBuffer(gl.ARRAY_BUFFER, susanVertexNormalBuffer);
     gl.vertexAttribPointer(shaderProgram.normalAttribute, 3, gl.FLOAT, gl.TRUE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
 
-
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, susanTexture);
     gl.uniform1i(shaderProgram.samplerUniform, 0);
@@ -424,21 +423,23 @@ function renderGame(now) {
     gl.drawElements(gl.TRIANGLES, susanIndices.length, gl.UNSIGNED_SHORT, 0);
     mvPopMatrix();
 
+    // Objekten način - dela
+    // mvPushMatrix();
+    // mat4.translate(worldMatrix, worldMatrix, [-5, 1, -2.0]);
+    // susanObject.vertexBuffer();
+    // gl.activeTexture(gl.TEXTURE0);
+    // gl.bindTexture(gl.TEXTURE_2D, susanTexture);
+    // gl.uniform1i(shaderProgram.samplerUniform, 0);
+    // setMatrixUniforms();
+    // susanObject.draw();
+    // mvPopMatrix();
+
     // // rišem horse
     mvPushMatrix();
 
-    if (hx > 17 ||  hx < -17){
-        speedx *= -1;
-    }
-    if (hz > 17 ||  hz < -17){
-        speedz *= -1;
-    }
-    hx += speedx;
-    hz += speedz;
-
-    spremeniSmer();
-
-    mat4.translate(worldMatrix, worldMatrix, [hx, 0.0, -hz]);
+    premakniObjekt(horse); // izračun premika
+    spremeniSmer(horse); // sprememba smeri
+    mat4.translate(worldMatrix, worldMatrix, [horse.positionx, 0.0, horse.positionz]);
     // mat4.rotateY(worldMatrix, worldMatrix, angle);
     gl.bindBuffer(gl.ARRAY_BUFFER, horseVertexPositionBuffer);
     gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
@@ -502,25 +503,36 @@ function renderGame(now) {
     // gl.drawArrays(gl.TRIANGLES, 0, 3);
     //mvPopMatrix();
 }
-let hx = Math.random();
-let hy = Math.random();
-let hz = Math.random();
-let speedx = 0.05;
-let speedz = -0.05;
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 let steviloIteracij = 0;
 
-function spremeniSmer(){
+let hx = randomIntFromInterval(-15, 15);
+let hz = randomIntFromInterval(-15, 15);
+
+let horse = new Direction(hx, hz, 0, 0);
+// objekto spremeni smer
+function spremeniSmer(object){
     if(steviloIteracij % 120 === 0){
-        speedz = randomIntFromInterval(-5, 5) / 100;
-        speedx = randomIntFromInterval(-5, 5) / 100;
+        object.speedx = randomIntFromInterval(-5, 5) / 100;
+        object.speedz = randomIntFromInterval(-5, 5) / 100;
     }
 }
+// premakni objekt
+function premakniObjekt(object){
+    if (object.positionx > 17 ||  object.positionx < -17){
+        object.speedx *= -1;
+    }
+    if (object.positionz > 17 ||  object.positionz < -17){
+        object.speedz *= -1;
+    }
+    object.positionx += object.speedx;
+    object.positionz += object.speedz;
+}
 
-function randomIntFromInterval(min,max)
-{
+function randomIntFromInterval(min,max) {
     return Math.floor(Math.random()*(max-min+1)+min);
 }
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /**
  *Funkcija glede na čas izračuna premikanje
  */

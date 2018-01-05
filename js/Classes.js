@@ -1,6 +1,6 @@
 // Gradnja modela
 class Model {
-    Model(gl, vertices, normals, indices, texture){
+    constructor(gl, vertices, normals, indices, texture){
         this.vertices = vertices; // točke
         this.normals = normals; // normale
         this.indices = indices; // povezave med točkami -> tvorijo trikotnik
@@ -38,7 +38,7 @@ class Model {
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
     }
 
-    draw() {
+    vertexBuffer() {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
         gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
         // gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
@@ -51,7 +51,34 @@ class Model {
         gl.vertexAttribPointer(shaderProgram.normalAttribute, 3, gl.FLOAT, gl.TRUE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
     }
 
-    verticesBuffer(){
+    draw(){
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.vbo);
+        gl.drawElements(gl.TRIANGLES, this.nPoints, gl.UNSIGNED_SHORT, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+    }
+}
+
+
+// Struktura za hitrost
+class Direction{
+    constructor(positionx, positionz, speedx = 0.05, speedz = 0.05){
+        this.positionx = positionx;
+        this.positionz = positionz;
+        this.speedx = speedx;
+        this.speedz = speedz;
+
+        this.radius = 1; // gledam na vse objekte kot da so krog
+    }
+
+    // metoda pogleda, ali se točka(x,z) dotika objekta
+    hitted(x, z) {
+        const razdalja = (x - this.positionx) * (x - this.positionx) + (z - this.positionz) * (z - this.positionz);
+        if(razdalja <= this.radius * this.radius)
+            return {
+                x: this.x,
+                z: this.z
+            };
+        return false;
     }
 }
