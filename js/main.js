@@ -66,14 +66,14 @@ function setMatrixUniforms() {
 }
 
 function mvPushMatrix() {
-    viewMatrixStack.push(mat4.copy(mat4.create(), viewMatrix));
+    worldMatrixStack.push(mat4.copy(mat4.create(), worldMatrix));
 }
 
 function mvPopMatrix() {
-    if (viewMatrixStack.length === 0) {
+    if (worldMatrixStack.length === 0) {
         throw "Invalid popMatrix!";
     }
-    viewMatrix = viewMatrixStack.pop();
+    worldMatrix = worldMatrixStack.pop();
 }
 
 function initTextures() {
@@ -283,16 +283,21 @@ function initBuffers() {
 /**
  * pred vsakim risanje potrebno shraniti view matriko z mvPushMatrix() in jo potem restorati z mvPopMatrix
  */
-function renderGame() {
+let angle = 0;
+function renderGame(now) {
     // set the rendering environment to full canvas size
     gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
     // Clear the canvas before we start drawing on it.
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+    // update fps
+    fpsCounter(now);
+    // obračanje
+    angle = now / 1000 / 6 * 2 * Math.PI;
+
     mat4.perspective(projMatrix, glMatrix.toRadian(45), gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
     mat4.identity(viewMatrix);
-   // mat4.identity(worldMatrix);
-
+    mat4.identity(worldMatrix);
 
     // premikanje
     mat4.rotate(viewMatrix, viewMatrix, glMatrix.toRadian(-pitch), [1, 0, 0]);
@@ -317,7 +322,8 @@ function renderGame() {
 
     // // rišem susan
     mvPushMatrix();
-    mat4.translate(viewMatrix, viewMatrix, [-3, 2.0, -7.0]);
+    mat4.translate(worldMatrix, worldMatrix, [-5, 2.0, -7.0]);
+    mat4.rotateX(worldMatrix, worldMatrix, angle);
     gl.bindBuffer(gl.ARRAY_BUFFER, susanVertexPositionBuffer);
     gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
     // gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
@@ -338,7 +344,7 @@ function renderGame() {
     // // rišem 1. kvadrat
     // narišem ga malo levo od mene, gledam v [0,0,0] torej čisto v center
     mvPushMatrix();
-    mat4.translate(viewMatrix, viewMatrix, [-1.5, 1.0, -7.0]);
+    mat4.translate(worldMatrix, worldMatrix, [-1.5, 1.0, -7.0]);
     gl.bindBuffer(gl.ARRAY_BUFFER, box1VertexBufferObject);
     gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 5 * Float32Array.BYTES_PER_ELEMENT, 0);
     gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 5 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
@@ -355,7 +361,7 @@ function renderGame() {
     // // rišem 2. kvadrat
     // narišem ga malo desno od mene, gledam v [0,0,0] torej čisto v center
     mvPushMatrix();
-    mat4.translate(viewMatrix, viewMatrix, [1.5, 1.0, -7.0]);
+    mat4.translate(worldMatrix, worldMatrix, [1.5, 1.0, -7.0]);
     gl.bindBuffer(gl.ARRAY_BUFFER, box2VertexBufferObject);
     gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 5 * Float32Array.BYTES_PER_ELEMENT, 0);
     gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 5 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
@@ -403,15 +409,33 @@ function animate() {
 // Samo za animacijo
 function tick(time) {
     if (texturesLoaded === 4) { // only draw scene and animate when textures are loaded.
-        animate(time);
+        animate();
         handleKeys();
-        renderGame();
+        renderGame(time);
     }
     else {
         console.log("Textures loading, loaded:", texturesLoaded);
     }
     requestAnimationFrame(tick);
 
+}
+
+function fpsCounter(now) {
+    now *= 0.001;                          // convert to seconds
+    const deltaTime = now - then;          // compute time since last frame
+    then = now;                            // remember time for next frame
+    const fps = 1 / deltaTime;             // compute frames per second
+    fpsElem.textContent = fps.toFixed(1);  // update fps display
+    // add the current fps and remove the oldest fps
+    totalFPS += fps - (frameTimes[frameCursor] || 0);
+    // record the newest fps
+    frameTimes[frameCursor++] = fps;
+    // needed so the first N frames, before we have maxFrames, is correct.
+    numFrames = Math.max(numFrames, frameCursor);
+    // wrap the cursor
+    frameCursor %= maxFrames;
+    const averageFPS = totalFPS / numFrames;
+    avgElem.textContent = averageFPS.toFixed(1);  // update avg display
 }
 
 let i = 0;
@@ -439,7 +463,7 @@ let susanVertexIndexBuffer;
 let worldMatrix = mat4.create(); // matrika sveta
 let projMatrix = mat4.create(); // projekcijska matrika
 let viewMatrix = mat4.create(); // matrika pogleda
-let viewMatrixStack = [];
+let worldMatrixStack = [];
 
 // kot obračanja, spremenljivke za računanje
 let lastTime = 0;
@@ -470,6 +494,18 @@ let texturesLoaded = 0;
 // Keyboard handling helper variable for reading the status of keys
 let currentlyPressedKeys = {};
 
+// fps counter
+const fpsElem = document.querySelector("#fps");
+const avgElem = document.querySelector("#avg");
+
+const frameTimes = [];
+let   frameCursor = 0;
+let   numFrames = 0;
+const maxFrames = 20;
+let   totalFPS = 0;
+
+let then = 0;
+
 const vertexShaderText = [
     'precision mediump float;',
     '',
@@ -498,13 +534,6 @@ const fragmentShaderText = [
     '  gl_FragColor = texture2D(sampler, fragTexCoord);',
     '}'
 ].join('\n');
-
-let triangleVertices = [
-    // X,    Y,   Z,     U, v
-    0.0, 1.0, 0.0,
-    -1.0, -1.0, 0.0,
-    1.0, -1.0, 0.0
-];
 
 // ni pomembno trenutno
 const vertexShaderDoom = [
@@ -563,12 +592,12 @@ function handleKeyUp(event) {
 // input handling. Function continuisly updates helper variables.
 //
 function handleKeys() {
-    if (currentlyPressedKeys[33]) {
-        // Page Up
-        pitchRate = 0.1;
-    } else if (currentlyPressedKeys[34]) {
-        // Page Down
-        pitchRate = -0.1;
+    if (currentlyPressedKeys[78]) {
+        // M
+        pitchRate = 0.08;
+    } else if (currentlyPressedKeys[77]) {
+        // N
+        pitchRate = -0.08;
     } else {
         pitchRate = 0;
     }

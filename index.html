@@ -14,13 +14,40 @@
             margin: 0;
             padding: 0;
         }
+        #fpsMaster {
+            font-size:100%;
+            color: black;
+            font-family: 'Roboto', sans-serif;
+            position: absolute;
+            top: 10px;
+            float:left;
+            width: 100%;
+            text-align: left;
+            z-index: 100;
+            display:block;
+            padding-left:20px;
+        }
+        #avgMaster{
+            font-size:100%;
+            color: black;
+            font-family: 'Roboto', sans-serif;
+            position: absolute;
+            top: 25px;
+            float:left;
+            width: 100%;
+            text-align: left;
+            z-index: 100;
+            display:block;
+            padding-left:20px;
+
+        }
     </style>
 </head>
 <body onload="start();">
-    <canvas id="game-surface" width="800px" height="600px">
+    <canvas id="game-surface" width="1000px" height="600px">
         Your browser does not support HTML5 canvas.
     </canvas>
-<br>
-<p>ola</p>
+    <div id = "fpsMaster">        fps: <span id="fps"></span></div>
+    <div id = "avgMaster">average fps: <span id="avg"></span></div>
 </body>
 </html>
