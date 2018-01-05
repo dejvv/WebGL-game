@@ -78,7 +78,7 @@ function normalizeArray(array, maxNew = 1, minNew = 0){
 
 function setModelsAttributes(models){
     susanObject = models[0];
-    susanVertices = susanObject.meshes[0].vertices;
+    susanVertices = normalizeArray(susanObject.meshes[0].vertices, 1, -1);
     susanIndices = [].concat.apply([], susanObject.meshes[0].faces);
     susanTexCoords = susanObject.meshes[0].texturecoords[0];
     susanNormals = susanObject.meshes[0].normals;
@@ -381,6 +381,7 @@ function renderGame(now) {
     mat4.rotate(viewMatrix, viewMatrix, glMatrix.toRadian(-yaw), [0, 1, 0]);
     mat4.translate(viewMatrix, viewMatrix, [-xPosition, -yPosition, -zPosition]);
 
+
     // // rišem world
     mvPushMatrix();
     gl.bindBuffer(gl.ARRAY_BUFFER, worldVertexTextureCoordBuffer);
@@ -400,7 +401,7 @@ function renderGame(now) {
     // rišem susan
     mvPushMatrix();
     //mat4.translate(world matrika, object.world, pomik);
-    mat4.translate(worldMatrix, worldMatrix, [-5, 2.0, -7.0]);
+    mat4.translate(worldMatrix, worldMatrix, [-5, 1, -7.0]);
     mat4.rotateX(worldMatrix, worldMatrix, angle);
     gl.bindBuffer(gl.ARRAY_BUFFER, susanVertexPositionBuffer);
     gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
@@ -425,8 +426,20 @@ function renderGame(now) {
 
     // // rišem horse
     mvPushMatrix();
-    mat4.translate(worldMatrix, worldMatrix, [-5, 0.0, -3.0]);
-    mat4.rotateY(worldMatrix, worldMatrix, angle);
+
+    if (hx > 17 ||  hx < -17){
+        speedx *= -1;
+    }
+    if (hz > 17 ||  hz < -17){
+        speedz *= -1;
+    }
+    hx += speedx;
+    hz += speedz;
+
+    spremeniSmer();
+
+    mat4.translate(worldMatrix, worldMatrix, [hx, 0.0, -hz]);
+    // mat4.rotateY(worldMatrix, worldMatrix, angle);
     gl.bindBuffer(gl.ARRAY_BUFFER, horseVertexPositionBuffer);
     gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
     // gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
@@ -481,6 +494,7 @@ function renderGame(now) {
     gl.drawElements(gl.TRIANGLES, box2Indices.length, gl.UNSIGNED_SHORT, 0);
     mvPopMatrix();
 
+    steviloIteracij++;
     // // updating matrices
     // setMatrixUniforms();
     //
@@ -488,7 +502,25 @@ function renderGame(now) {
     // gl.drawArrays(gl.TRIANGLES, 0, 3);
     //mvPopMatrix();
 }
+let hx = Math.random();
+let hy = Math.random();
+let hz = Math.random();
+let speedx = 0.05;
+let speedz = -0.05;
 
+let steviloIteracij = 0;
+
+function spremeniSmer(){
+    if(steviloIteracij % 120 === 0){
+        speedz = randomIntFromInterval(-5, 5) / 100;
+        speedx = randomIntFromInterval(-5, 5) / 100;
+    }
+}
+
+function randomIntFromInterval(min,max)
+{
+    return Math.floor(Math.random()*(max-min+1)+min);
+}
 /**
  *Funkcija glede na čas izračuna premikanje
  */

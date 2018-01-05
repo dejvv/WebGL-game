@@ -38,7 +38,7 @@ class Model {
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
     }
 
-    otherBuffers(){
+    draw() {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
         gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
         // gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
@@ -49,9 +49,6 @@ class Model {
 
         gl.bindBuffer(gl.ARRAY_BUFFER, this.nbo);
         gl.vertexAttribPointer(shaderProgram.normalAttribute, 3, gl.FLOAT, gl.TRUE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
-    }
-    draw() {
-        gl.drawElements(gl.TRIANGLES, this.nPoints, gl.UNSIGNED_SHORT, 0);
     }
 
     verticesBuffer(){
