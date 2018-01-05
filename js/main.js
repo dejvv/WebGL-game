@@ -29,7 +29,7 @@ function start() {
         initObjects();
         Promise.all([
             loadWorld("./assets/down.txt", "down"),
-            loadWorld("./assets/stene.txt", "stene"),
+            loadWorld("./assets/zidi.txt", "stene"),
             loadWorld("./assets/up.txt", "up")
         ]).then(() => {
 
@@ -197,7 +197,7 @@ function initTextures() {
     steneTexture.image.onload = function () {
         handleTextureLoaded(steneTexture);
     };
-    steneTexture.image.src = "./assets/grass.png";
+    steneTexture.image.src = "./assets/crate.png";
 
 }
 
@@ -485,6 +485,7 @@ function renderGame(now) {
 
     // update fps
     fpsCounter(now);
+    zivljenjaDisplay();
     // obračanje
     angle = now / 1000 / 6 * 2 * Math.PI;
     // poskrbim da ni kolizij
@@ -492,8 +493,10 @@ function renderGame(now) {
 
     // ce je prislo do kolizijo ali je cca 10s mimo, se banana odstrani
     if(bananaPostavljena % 600 == 0){
-        if(izrisHrane) objekti.pop(); // odstrani banano
         izrisHrane = false;
+        zivljenja--;
+    } else{
+        tocke++;
     }
 
     mat4.perspective(projMatrix, glMatrix.toRadian(45), gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
@@ -592,32 +595,32 @@ function renderGame(now) {
     // mvPopMatrix();
 
     // // rišem horse
-    mvPushMatrix();
+    for(let i = 0; i < 4; i++) {
+        mvPushMatrix();
+        premakniObjekt(objekti[i]); // izračun premik
+        spremeniSmer(objekti[i]); // sprememba smeri
+        mat4.translate(worldMatrix, worldMatrix, [objekti[i].positionx, 0.0, objekti[i].positionz]);
+        // mat4.rotateY(worldMatrix, worldMatrix, angle);
+        gl.bindBuffer(gl.ARRAY_BUFFER, horseVertexPositionBuffer);
+        gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+        // gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
 
-    premakniObjekt(horse); // izračun premika
-    spremeniSmer(horse); // sprememba smeri
-    mat4.translate(worldMatrix, worldMatrix, [horse.positionx, 0.0, horse.positionz]);
-    // mat4.rotateY(worldMatrix, worldMatrix, angle);
-    gl.bindBuffer(gl.ARRAY_BUFFER, horseVertexPositionBuffer);
-    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
-    // gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+        gl.bindBuffer(gl.ARRAY_BUFFER, horseVertexTextureCoordBuffer);
+        gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 2 * Float32Array.BYTES_PER_ELEMENT, 0);
+        // gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, horseVertexTextureCoordBuffer);
-    gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 2 * Float32Array.BYTES_PER_ELEMENT, 0);
-    // gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
+        gl.bindBuffer(gl.ARRAY_BUFFER, horseVertexNormalBuffer);
+        gl.vertexAttribPointer(shaderProgram.normalAttribute, 3, gl.FLOAT, gl.TRUE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, horseVertexNormalBuffer);
-    gl.vertexAttribPointer(shaderProgram.normalAttribute, 3, gl.FLOAT, gl.TRUE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, horseTexture);
+        gl.uniform1i(shaderProgram.samplerUniform, 0);
 
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, horseTexture);
-    gl.uniform1i(shaderProgram.samplerUniform, 0);
-
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, horseVertexIndexBuffer);
-    setMatrixUniforms();
-    gl.drawElements(gl.TRIANGLES, horseIndices.length, gl.UNSIGNED_SHORT, 0);
-    mvPopMatrix();
-
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, horseVertexIndexBuffer);
+        setMatrixUniforms();
+        gl.drawElements(gl.TRIANGLES, horseIndices.length, gl.UNSIGNED_SHORT, 0);
+        mvPopMatrix();
+    }
     // // rišem banana
     if (izrisHrane) {
         bananaPostavljena++;
@@ -648,65 +651,34 @@ function renderGame(now) {
     }
 
     // // rišem wolf
-    mvPushMatrix();
-    premakniObjekt(wolf); // izračun premik
-    spremeniSmer(wolf); // sprememba smeri
-    mat4.translate(worldMatrix, worldMatrix, [wolf.positionx, 0.0, wolf.positionz]);
+    for(let i = 4; i < objekti.length - 1; i++) {
+        mvPushMatrix();
+        premakniObjekt(objekti[i]); // izračun premik
+        spremeniSmer(objekti[i]); // sprememba smeri
+        mat4.translate(worldMatrix, worldMatrix, [objekti[i].positionx, 0.0, objekti[i].positionz]);
 
-    // mat4.rotateY(worldMatrix, worldMatrix, angle);
-    gl.bindBuffer(gl.ARRAY_BUFFER, wolfVertexPositionBuffer);
-    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
-    // gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+        // mat4.rotateY(worldMatrix, worldMatrix, angle);
+        gl.bindBuffer(gl.ARRAY_BUFFER, wolfVertexPositionBuffer);
+        gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+        // gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, wolfVertexTextureCoordBuffer);
-    gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 2 * Float32Array.BYTES_PER_ELEMENT, 0);
-    // gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
+        gl.bindBuffer(gl.ARRAY_BUFFER, wolfVertexTextureCoordBuffer);
+        gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 2 * Float32Array.BYTES_PER_ELEMENT, 0);
+        // gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, wolfVertexNormalBuffer);
-    gl.vertexAttribPointer(shaderProgram.normalAttribute, 3, gl.FLOAT, gl.TRUE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, wolfVertexNormalBuffer);
+        gl.vertexAttribPointer(shaderProgram.normalAttribute, 3, gl.FLOAT, gl.TRUE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
 
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, wolfTexture);
-    gl.uniform1i(shaderProgram.samplerUniform, 0);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, wolfTexture);
+        gl.uniform1i(shaderProgram.samplerUniform, 0);
 
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, wolfVertexIndexBuffer);
-    setMatrixUniforms();
-    gl.drawElements(gl.TRIANGLES, wolfIndices.length, gl.UNSIGNED_SHORT, 0);
-    mvPopMatrix();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, wolfVertexIndexBuffer);
+        setMatrixUniforms();
+        gl.drawElements(gl.TRIANGLES, wolfIndices.length, gl.UNSIGNED_SHORT, 0);
+        mvPopMatrix();
+    }
 
-    // // rišem 1. kvadrat
-    // narišem ga malo levo od mene, gledam v [0,0,0] torej čisto v center
-    mvPushMatrix();
-    mat4.translate(worldMatrix, worldMatrix, [b1.positionx, 1.0, b1.positionz]);
-    gl.bindBuffer(gl.ARRAY_BUFFER, box1VertexBufferObject);
-    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 5 * Float32Array.BYTES_PER_ELEMENT, 0);
-    gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 5 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
-
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, boxTexture);
-    gl.uniform1i(shaderProgram.samplerUniform, 0);
-
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, box1IndexBufferObject);
-    setMatrixUniforms(); // čistka matrike
-    gl.drawElements(gl.TRIANGLES, box1Indices.length, gl.UNSIGNED_SHORT, 0);
-    mvPopMatrix();
-
-    // // rišem 2. kvadrat
-    // narišem ga malo desno od mene, gledam v [0,0,0] torej čisto v center
-    mvPushMatrix();
-    mat4.translate(worldMatrix, worldMatrix, [b2.positionx, 1.0, b2.positionz]);
-    gl.bindBuffer(gl.ARRAY_BUFFER, box2VertexBufferObject);
-    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 5 * Float32Array.BYTES_PER_ELEMENT, 0);
-    gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 5 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
-
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, heheTexture);
-    gl.uniform1i(shaderProgram.samplerUniform, 0);
-
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, box2IndexBufferObject);
-    setMatrixUniforms(); // čistka matrike
-    gl.drawElements(gl.TRIANGLES, box2Indices.length, gl.UNSIGNED_SHORT, 0);
-    mvPopMatrix();
 
     steviloIteracij++;
     // // updating matrices
@@ -721,27 +693,47 @@ let collision = false;
 let steviloIteracij = 0; // stevilo iteracij
 let bananaPostavljena; // kdaj sem postavil banano
 let objekti = []; // array za vse objekte tipa Direction
+let zivljenja = 5; // zivljenja
+let tocke = 0;
+const zivElem = document.querySelector("#ziv");
+const tckElem = document.querySelector("#tck");
+
 
 // hrana
 let izrisHrane = false;
 let xhrana = 0;
 let zhrana = 0;
 
+
 // objekti
 let horse;
 let wolf;
-let b1;
-let b2;
+let horse1;
+let wolf1;
+let horse2;
+let wolf2;
+let horse3;
+let wolf3;
 
 function initObjects(){
-    horse = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15), 0, 0, "horse");
-    wolf = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15), 0, 0, "wolf");
-    b1 = new Direction(-1.5,-7.0,0,0);
-    b2 = new Direction(1.5,-7.0,0,0);
+    horse = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15), 0, 0, "horse0");
+    wolf = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15), 0, 0, "wolf0");
+    horse1 = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15), 0, 0, "horse1");
+    wolf1 = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15), 0, 0, "wolf1");
+    horse2 = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15), 0, 0, "horse2");
+    wolf2 = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15), 0, 0, "wolf2");
+    horse3 = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15), 0, 0, "horse3");
+    wolf3 = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15), 0, 0, "wolf3");
+    let banana = new Direction(xhrana, zhrana, 0,0, "banana");
     objekti.push(horse);
+    objekti.push(horse1);
+    objekti.push(horse2);
+    objekti.push(horse3);
     objekti.push(wolf);
-    objekti.push(b1);
-    objekti.push(b2);
+    objekti.push(wolf1);
+    objekti.push(wolf2);
+    objekti.push(wolf3);
+    objekti.push(banana);
 }
 
 // objekto spremeni smer
@@ -769,25 +761,30 @@ function isCollision(object, x, z){
 }
 // funkcija gre skozi vse predmete in preveri ali se dotikajo in jih obrne
 function noCollision(){
+    let a = [];
     for(let i = 0; i < objekti.length; i++){
         for(let j = 0; j < objekti.length; j++){
             if(i === j) break; // nemore objetk samega sebe zadet
             collision = isCollision(objekti[i], objekti[j].positionx, objekti[j].positionz);
             if(collision) {
-                objekti[i].speedx *= -1;
-                objekti[i].speedz *= -1;
-                objekti[j].speedx *= -1;
-                objekti[j].speedz *= -1;
+                if((objekti[i].name !== "banana")) {
+                    objekti[i].speedx *= -1;
+                    objekti[i].speedz *= -1;
+                }
+                if((objekti[j].name !== "banana")) {
+                    objekti[j].speedx *= -1;
+                    objekti[j].speedz *= -1;
+                }
                 console.log("[COLLISION] on: (",objekti[j].positionx, objekti[j].positionz,")");
                 console.log("[COLLISION] between:",objekti[i].name,"and",objekti[j].name)
             }
             if(collision && (objekti[j].name === "banana" || objekti[i].name === "banana")){
                 console.log("you spotted a bananaaaaaaaaanaaaaaa!");
-                if(izrisHrane) objekti.pop(); // odstrani banano
                 izrisHrane = false;
             }
         }
     }
+    // objekti = objekti.filter((j, i ) => a.indexOf(i) === -1)
 }
 
 function randomIntFromInterval(min,max) {
@@ -847,6 +844,15 @@ function fpsCounter(now) {
     frameCursor %= maxFrames;
     const averageFPS = totalFPS / numFrames;
     avgElem.textContent = averageFPS.toFixed(1);  // update avg display
+}
+function zivljenjaDisplay() {
+    zivElem.textContent = zivljenja;
+    tckElem.textContent = tocke;
+
+    if(zivljenja === 0) {
+        alert("Game over!");
+        window.location.reload(false);
+    }
 }
 
 let i = 0;
@@ -1079,8 +1085,6 @@ function handleKeys() {
             izrisHrane = true;
             xhrana = xPosition;
             zhrana = zPosition;
-            let banana = new Direction(xhrana, zhrana, 0,0, "banana");
-            objekti.push(banana);
             bananaPostavljena = 1;
             console.log("Banana placed: (", xhrana, zhrana,")");
         }

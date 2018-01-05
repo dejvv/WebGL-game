@@ -1,0 +1,2 @@
+Za izvajanje je potreben osnoven http strežnik.
+Vse datoteke in imenike skopirajte v ta strežnik.
