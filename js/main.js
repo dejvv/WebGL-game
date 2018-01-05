@@ -26,12 +26,18 @@ function start() {
         initShaders();
         initBuffers();
         initTextures();
-        loadWorld();
+        initObjects();
+        Promise.all([
+            loadWorld("./assets/down.txt", "down"),
+            loadWorld("./assets/stene.txt", "stene"),
+            loadWorld("./assets/up.txt", "up")
+        ]).then(() => {
 
-        document.onkeydown = handleKeyDown;
-        document.onkeyup = handleKeyUp;
+            document.onkeydown = handleKeyDown;
+            document.onkeyup = handleKeyUp;
 
-        requestAnimationFrame(tick);
+            requestAnimationFrame(tick);
+        });
     });
 
     // loadExternalModel()
@@ -179,6 +185,20 @@ function initTextures() {
     };
     wolfTexture.image.src = "./assets/wolfB.png";
 
+    upTexture = gl.createTexture();
+    upTexture.image = new Image();
+    upTexture.image.onload = function () {
+        handleTextureLoaded(upTexture);
+    };
+    upTexture.image.src = "./assets/sky.png";
+
+    steneTexture = gl.createTexture();
+    steneTexture.image = new Image();
+    steneTexture.image.onload = function () {
+        handleTextureLoaded(steneTexture);
+    };
+    steneTexture.image.src = "./assets/grass.png";
+
 }
 
 function handleTextureLoaded(texture, img) {
@@ -204,7 +224,7 @@ function handleTextureLoaded(texture, img) {
     texturesLoaded++;
 }
 
-function handleLoadedWorld(data) {
+function handleLoadedWorld(data, name) {
     var lines = data.split("\n");
     var vertexCount = 0;
     var vertexPositions = [];
@@ -225,28 +245,57 @@ function handleLoadedWorld(data) {
         }
     }
 
-    worldVertexPositionBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, worldVertexPositionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPositions), gl.STATIC_DRAW);
-    worldVertexPositionBuffer.itemSize = 3;
-    worldVertexPositionBuffer.numItems = vertexCount;
+    if(name === "down") {
+        groundVertexPositionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, groundVertexPositionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPositions), gl.STATIC_DRAW);
+        groundVertexPositionBuffer.itemSize = 3;
+        groundVertexPositionBuffer.numItems = vertexCount;
 
-    worldVertexTextureCoordBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, worldVertexTextureCoordBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexTextureCoords), gl.STATIC_DRAW);
-    worldVertexTextureCoordBuffer.itemSize = 2;
-    worldVertexTextureCoordBuffer.numItems = vertexCount;
+        groundVertexTextureCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, groundVertexTextureCoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexTextureCoords), gl.STATIC_DRAW);
+        groundVertexTextureCoordBuffer.itemSize = 2;
+        groundVertexTextureCoordBuffer.numItems = vertexCount;
+    } else if(name ==="up"){
+        upVertexPositionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, upVertexPositionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPositions), gl.STATIC_DRAW);
+        upVertexPositionBuffer.itemSize = 3;
+        upVertexPositionBuffer.numItems = vertexCount;
+
+        upVertexTextureCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, upVertexTextureCoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexTextureCoords), gl.STATIC_DRAW);
+        upVertexTextureCoordBuffer.itemSize = 2;
+        upVertexTextureCoordBuffer.numItems = vertexCount;
+    } else {
+        steneVertexPositionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, steneVertexPositionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPositions), gl.STATIC_DRAW);
+        steneVertexPositionBuffer.itemSize = 3;
+        steneVertexPositionBuffer.numItems = vertexCount;
+
+        steneVertexTextureCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, steneVertexTextureCoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexTextureCoords), gl.STATIC_DRAW);
+        steneVertexTextureCoordBuffer.itemSize = 2;
+        steneVertexTextureCoordBuffer.numItems = vertexCount;
+    }
 }
 
-function loadWorld() {
-    var request = new XMLHttpRequest();
-    request.open("GET", "./assets/world.txt");
-    request.onreadystatechange = function () {
-        if (request.readyState == 4) {
-            handleLoadedWorld(request.responseText);
-        }
-    };
-    request.send();
+function loadWorld(pot, name) {
+    return new Promise((resolve, reject) => {
+        var request = new XMLHttpRequest();
+        request.open("GET", pot);
+        request.onreadystatechange = function () {
+            if (request.readyState == 4) {
+                handleLoadedWorld(request.responseText, name);
+            }
+            resolve();
+        };
+        request.send();
+    });
 }
 
 function initGl(canvas) {
@@ -441,6 +490,12 @@ function renderGame(now) {
     // poskrbim da ni kolizij
     noCollision();
 
+    // ce je prislo do kolizijo ali je cca 10s mimo, se banana odstrani
+    if(bananaPostavljena % 600 == 0){
+        if(izrisHrane) objekti.pop(); // odstrani banano
+        izrisHrane = false;
+    }
+
     mat4.perspective(projMatrix, glMatrix.toRadian(45), gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
     mat4.identity(viewMatrix);
     mat4.identity(worldMatrix);
@@ -448,29 +503,62 @@ function renderGame(now) {
     // premikanje
     mat4.rotate(viewMatrix, viewMatrix, glMatrix.toRadian(-pitch), [1, 0, 0]);
     mat4.rotate(viewMatrix, viewMatrix, glMatrix.toRadian(-yaw), [0, 1, 0]);
-    mat4.translate(viewMatrix, viewMatrix, [-xPosition, -yPosition, -zPosition]);
+    mat4.translate(viewMatrix, viewMatrix, [-xPosition, -yPosition - 0.25, -zPosition]);
 
 
     // // rišem world
+    // ground
     mvPushMatrix();
-    gl.bindBuffer(gl.ARRAY_BUFFER, worldVertexTextureCoordBuffer);
-    gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, worldVertexTextureCoordBuffer.itemSize, gl.FLOAT, gl.FALSE, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, groundVertexTextureCoordBuffer);
+    gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, groundVertexTextureCoordBuffer.itemSize, gl.FLOAT, gl.FALSE, 0, 0);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, worldVertexPositionBuffer);
-    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, worldVertexPositionBuffer.itemSize, gl.FLOAT, gl.FALSE, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, groundVertexPositionBuffer);
+    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, groundVertexPositionBuffer.itemSize, gl.FLOAT, gl.FALSE, 0, 0);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, groundTexture);
     gl.uniform1i(shaderProgram.samplerUniform, 0);
 
     setMatrixUniforms();
-    gl.drawArrays(gl.TRIANGLES, 0, worldVertexPositionBuffer.numItems);
+    gl.drawArrays(gl.TRIANGLES, 0, groundVertexPositionBuffer.numItems);
+    mvPopMatrix();
+
+    // sky
+    mvPushMatrix();
+    gl.bindBuffer(gl.ARRAY_BUFFER, upVertexTextureCoordBuffer);
+    gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, upVertexTextureCoordBuffer.itemSize, gl.FLOAT, gl.FALSE, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, upVertexPositionBuffer);
+    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, upVertexPositionBuffer.itemSize, gl.FLOAT, gl.FALSE, 0, 0);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, upTexture);
+    gl.uniform1i(shaderProgram.samplerUniform, 0);
+
+    setMatrixUniforms();
+    gl.drawArrays(gl.TRIANGLES, 0, upVertexPositionBuffer.numItems);
+    mvPopMatrix();
+
+    // wall
+    mvPushMatrix();
+    gl.bindBuffer(gl.ARRAY_BUFFER, steneVertexTextureCoordBuffer);
+    gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, steneVertexTextureCoordBuffer.itemSize, gl.FLOAT, gl.FALSE, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, steneVertexPositionBuffer);
+    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, steneVertexPositionBuffer.itemSize, gl.FLOAT, gl.FALSE, 0, 0);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, steneTexture);
+    gl.uniform1i(shaderProgram.samplerUniform, 0);
+
+    setMatrixUniforms();
+    gl.drawArrays(gl.TRIANGLES, 0, steneVertexPositionBuffer.numItems);
     mvPopMatrix();
 
     // rišem susan
     mvPushMatrix();
     //mat4.translate(world matrika, object.world, pomik);
-    mat4.translate(worldMatrix, worldMatrix, [0, 5.0, -17.0]);
+    mat4.translate(worldMatrix, worldMatrix, [0.0, 5.0, -17.0]);
     mat4.rotateX(worldMatrix, worldMatrix, angle);
     gl.bindBuffer(gl.ARRAY_BUFFER, susanVertexPositionBuffer);
     gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
@@ -531,28 +619,33 @@ function renderGame(now) {
     mvPopMatrix();
 
     // // rišem banana
-    mvPushMatrix();
-    mat4.translate(worldMatrix, worldMatrix, [banana.positionx, 0.0, banana.positionz]);
-    // mat4.rotateY(worldMatrix, worldMatrix, angle);
-    gl.bindBuffer(gl.ARRAY_BUFFER, bananaVertexPositionBuffer);
-    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
-    // gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+    if (izrisHrane) {
+        bananaPostavljena++;
+        mvPushMatrix();
+        objekti[objekti.length - 1].positionx = xhrana;
+        objekti[objekti.length - 1].positionz = zhrana;
+        mat4.translate(worldMatrix, worldMatrix, [xhrana, 0.0, zhrana]);
+        // mat4.rotateY(worldMatrix, worldMatrix, angle);
+        gl.bindBuffer(gl.ARRAY_BUFFER, bananaVertexPositionBuffer);
+        gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+        // gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, bananaVertexTextureCoordBuffer);
-    gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 2 * Float32Array.BYTES_PER_ELEMENT, 0);
-    // gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
+        gl.bindBuffer(gl.ARRAY_BUFFER, bananaVertexTextureCoordBuffer);
+        gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 2 * Float32Array.BYTES_PER_ELEMENT, 0);
+        // gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, bananaVertexNormalBuffer);
-    gl.vertexAttribPointer(shaderProgram.normalAttribute, 3, gl.FLOAT, gl.TRUE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, bananaVertexNormalBuffer);
+        gl.vertexAttribPointer(shaderProgram.normalAttribute, 3, gl.FLOAT, gl.TRUE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
 
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, bananaTexture);
-    gl.uniform1i(shaderProgram.samplerUniform, 0);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, bananaTexture);
+        gl.uniform1i(shaderProgram.samplerUniform, 0);
 
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bananaVertexIndexBuffer);
-    setMatrixUniforms();
-    gl.drawElements(gl.TRIANGLES, bananaIndices.length, gl.UNSIGNED_SHORT, 0);
-    mvPopMatrix();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bananaVertexIndexBuffer);
+        setMatrixUniforms();
+        gl.drawElements(gl.TRIANGLES, bananaIndices.length, gl.UNSIGNED_SHORT, 0);
+        mvPopMatrix();
+    }
 
     // // rišem wolf
     mvPushMatrix();
@@ -624,26 +717,38 @@ function renderGame(now) {
     //mvPopMatrix();
 }
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-let steviloIteracij = 0;
-let objekti = [];
+let collision = false;
+let steviloIteracij = 0; // stevilo iteracij
+let bananaPostavljena; // kdaj sem postavil banano
+let objekti = []; // array za vse objekte tipa Direction
 
-let horse = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15), 0, 0, "horse");
-let wolf = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15), 0, 0, "wolf");
-let banana = new Direction(-5.0,-2.0,0,0, "banana");
-let b1 = new Direction(-1.5,-7.0,0,0);
-let b2 = new Direction(1.5,-7.0,0,0);
-objekti.push(horse);
-objekti.push(wolf);
-objekti.push(banana);
-objekti.push(b1);
-objekti.push(b2);
+// hrana
+let izrisHrane = false;
+let xhrana = 0;
+let zhrana = 0;
+
+// objekti
+let horse;
+let wolf;
+let b1;
+let b2;
+
+function initObjects(){
+    horse = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15), 0, 0, "horse");
+    wolf = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15), 0, 0, "wolf");
+    b1 = new Direction(-1.5,-7.0,0,0);
+    b2 = new Direction(1.5,-7.0,0,0);
+    objekti.push(horse);
+    objekti.push(wolf);
+    objekti.push(b1);
+    objekti.push(b2);
+}
 
 // objekto spremeni smer
 function spremeniSmer(object){
     if(steviloIteracij % 120 === 0){
-        object.speedx = randomIntFromInterval(-5, 5) / 10;
-        object.speedz = randomIntFromInterval(-5, 5) / 10;
-        angle *= -1;
+        object.speedx = randomIntFromInterval(-5, 5) / 100;
+        object.speedz = randomIntFromInterval(-5, 5) / 100;
     }
 }
 // premakni objekt
@@ -667,8 +772,8 @@ function noCollision(){
     for(let i = 0; i < objekti.length; i++){
         for(let j = 0; j < objekti.length; j++){
             if(i === j) break; // nemore objetk samega sebe zadet
-            let c = isCollision(objekti[i], objekti[j].positionx, objekti[j].positionz);
-            if(c) {
+            collision = isCollision(objekti[i], objekti[j].positionx, objekti[j].positionz);
+            if(collision) {
                 objekti[i].speedx *= -1;
                 objekti[i].speedz *= -1;
                 objekti[j].speedx *= -1;
@@ -676,8 +781,10 @@ function noCollision(){
                 console.log("[COLLISION] on: (",objekti[j].positionx, objekti[j].positionz,")");
                 console.log("[COLLISION] between:",objekti[i].name,"and",objekti[j].name)
             }
-            if(c && (objekti[j].name === "banana" || objekti[i].name === "banana")){
+            if(collision && (objekti[j].name === "banana" || objekti[i].name === "banana")){
                 console.log("you spotted a bananaaaaaaaaanaaaaaa!");
+                if(izrisHrane) objekti.pop(); // odstrani banano
+                izrisHrane = false;
             }
         }
     }
@@ -712,7 +819,7 @@ function animate() {
 
 // Samo za animacijo
 function tick(time) {
-    if (texturesLoaded === 7) { // only draw scene and animate when textures are loaded.
+    if (texturesLoaded === 9) { // only draw scene and animate when textures are loaded.
         animate();
         handleKeys();
         renderGame(time);
@@ -751,8 +858,12 @@ let canvas; // canvas
 let gl; // webgl content
 
 // Buffers
-let worldVertexPositionBuffer = null;
-let worldVertexTextureCoordBuffer = null;
+let groundVertexPositionBuffer = null;
+let groundVertexTextureCoordBuffer = null;
+let steneVertexPositionBuffer = null;
+let steneVertexTextureCoordBuffer = null;
+let upVertexPositionBuffer = null;
+let upVertexTextureCoordBuffer = null;
 let box1VertexBufferObject;
 let box1IndexBufferObject;
 let box2VertexBufferObject;
@@ -834,6 +945,8 @@ let susanTexture;
 let horseTexture;
 let bananaTexture;
 let wolfTexture;
+let upTexture;
+let steneTexture;
 
 // Variable that stores  loading state of textures.
 let texturesLoaded = 0;
@@ -961,10 +1074,16 @@ function handleKeys() {
     }
 
     if (currentlyPressedKeys[70]){
-        /*
-
-        TU BO ZA SPAWN IN PREMIK BURGERJA
-         */
+        console.log("F pressed, ", izrisHrane);
+        if(!izrisHrane) {
+            izrisHrane = true;
+            xhrana = xPosition;
+            zhrana = zPosition;
+            let banana = new Direction(xhrana, zhrana, 0,0, "banana");
+            objekti.push(banana);
+            bananaPostavljena = 1;
+            console.log("Banana placed: (", xhrana, zhrana,")");
+        }
     }
 }
 
