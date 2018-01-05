@@ -47,6 +47,7 @@ function loadExternalModel() {
                 susanVertices = susanObject.meshes[0].vertices;
                 susanIndices = [].concat.apply([], susanObject.meshes[0].faces);
                 susanTexCoords = susanObject.meshes[0].texturecoords[0];
+                susanNormals = susanObject.meshes[0].normals;
                 resolve();
             }
         });
@@ -55,9 +56,11 @@ function loadExternalModel() {
 }
 
 let susanObject;
+
 let susanVertices;
 let susanIndices;
 let susanTexCoords;
+let susanNormals;
 
 function setMatrixUniforms() {
     gl.uniformMatrix4fv(shaderProgram.projMatrixUniform, false, projMatrix);
@@ -234,8 +237,10 @@ function initShaders() {
 
     shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "vertPosition");
     shaderProgram.textureCoordAttribute = gl.getAttribLocation(shaderProgram, "vertTexCoord");
+    shaderProgram.normalAttribute = gl.getAttribLocation(shaderProgram, "vertNormal");
     gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
     gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
+    gl.enableVertexAttribArray(shaderProgram.normalAttribute);
 
 
     shaderProgram.projMatrixUniform = gl.getUniformLocation(shaderProgram, "mProj");
@@ -243,6 +248,15 @@ function initShaders() {
     shaderProgram.viewMatrixUniform = gl.getUniformLocation(shaderProgram, "mView");
     // store location of uSampler variable defined in shader
     shaderProgram.samplerUniform = gl.getUniformLocation(shaderProgram, "sampler");
+
+
+    ambientUniformLocation = gl.getUniformLocation(shaderProgram, 'ambientLightIntensity');
+    sunlightDirUniformLocation = gl.getUniformLocation(shaderProgram, 'sun.direction');
+    sunlightIntUniformLocation = gl.getUniformLocation(shaderProgram, 'sun.color');
+
+    gl.uniform3f(ambientUniformLocation, 0.8, 0.8, 0.8);
+    gl.uniform3f(sunlightDirUniformLocation, 3.0, 4.0, -2.0);
+    gl.uniform3f(sunlightIntUniformLocation, 0.9, 0.9, 0.9);
 
 }
 
@@ -278,8 +292,47 @@ function initBuffers() {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, susanVertexIndexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(susanIndices), gl.STATIC_DRAW);
 
+    susanVertexNormalBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, susanVertexNormalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(susanNormals), gl.STATIC_DRAW);
 }
 
+// Gradnja modela
+class Model {
+    Model(gl, coordinates, vertices, normals, indices, texture){
+        this.coordinates = coordinates; // koordinati - tudi v this.world, ki je matrika
+        this.vertices = vertices; // točke
+        this.normals = normals; // normale
+        this.indices = indices; // povezave med točkami -> tvorijo trikotnik
+        this.texture = texture; // za texture
+
+        this.vbo = gl.createBuffer(); // vertex buffer
+        this.ibo = gl.createBuffer(); // indices buffer
+        this.nbo = gl.createBuffer(); // normals buffer
+        this.tbo = gl.createBuffer(); // texture buffer
+
+        this.nPoints = indices.length; // stevilo tock
+        this.world = mat4.create();
+    }
+    // vertex
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.STATIC_DRAW);
+
+    // normal
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.nbo);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.normals), gl.STATIC_DRAW);
+
+    // index
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.ibo);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.indices), gl.STATIC_DRAW);
+
+    // texture
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.tbo);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.texture), gl.STATIC_DRAW);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+}
 /**
  * pred vsakim risanje potrebno shraniti view matriko z mvPushMatrix() in jo potem restorati z mvPopMatrix
  */
@@ -331,6 +384,10 @@ function renderGame(now) {
     gl.bindBuffer(gl.ARRAY_BUFFER, susanVertexTextureCoordBuffer);
     gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 2 * Float32Array.BYTES_PER_ELEMENT, 0);
     // gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, susanVertexNormalBuffer);
+    gl.vertexAttribPointer(shaderProgram.normalAttribute, 3, gl.FLOAT, gl.TRUE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, susanTexture);
@@ -457,6 +514,7 @@ let box2IndexBufferObject;
 let susanVertexPositionBuffer;
 let susanVertexTextureCoordBuffer;
 let susanVertexIndexBuffer;
+let susanVertexNormalBuffer;
 
 
 // matrike
@@ -468,6 +526,11 @@ let worldMatrixStack = [];
 // kot obračanja, spremenljivke za računanje
 let lastTime = 0;
 let timeNow;
+
+// lightning
+let ambientUniformLocation;
+let sunlightDirUniformLocation;
+let sunlightIntUniformLocation;
 
 // jogging
 let joggingAngle = 0;
@@ -511,7 +574,9 @@ const vertexShaderText = [
     '',
     'attribute vec3 vertPosition;',
     'attribute vec2 vertTexCoord;',
+    'attribute vec3 vertNormal;',
     'varying vec2 fragTexCoord;',
+    'varying vec3 fragNormal;',
     'uniform mat4 mWorld;',
     'uniform mat4 mView;',
     'uniform mat4 mProj;',
@@ -519,6 +584,7 @@ const vertexShaderText = [
     'void main()',
     '{',
     '  fragTexCoord = vertTexCoord;',
+    '  fragNormal = (mWorld * vec4(vertNormal, 0.0)).xyz;',
     '  gl_Position = mProj * mView * mWorld * vec4(vertPosition, 1.0);',
     '}'
 ].join('\n');
@@ -526,12 +592,29 @@ const vertexShaderText = [
 const fragmentShaderText = [
     'precision mediump float;',
     '',
+    'struct DirectionalLight',
+    '{',
+    ' vec3 direction;',
+    ' vec3 color;',
+    '};',
+    '',
     'varying vec2 fragTexCoord;',
+    'varying vec3 fragNormal;',
+    '',
+    'uniform vec3 ambientLightIntensity;',
+    'uniform DirectionalLight sun;',
     'uniform sampler2D sampler;',
     '',
     'void main()',
     '{',
-    '  gl_FragColor = texture2D(sampler, fragTexCoord);',
+    'vec3 surfaceNormal = normalize(fragNormal);',
+    'vec3 normSunDir = normalize(sun.direction);',
+    'vec4 texel = texture2D(sampler, fragTexCoord);',
+    '',
+    'vec3 lightIntensity = ambientLightIntensity +',
+    'sun.color * max(dot(fragNormal, normSunDir), 0.0);',
+    '',
+    'gl_FragColor = vec4(texel.rgb * lightIntensity, texel.a);',
     '}'
 ].join('\n');
 
@@ -790,3 +873,12 @@ var box2Indices =
         21, 20, 22,
         22, 20, 23
     ];
+
+/*
+TODO:
+-da se krava premika sama,
+-da ji lahko vržeš hrano, ki jo pobere
+-ostalo je bonus
+ * glej render za vse objekte, shawmaping od 492. vrstice naprej
+ * glej Models objekt, ki bo definicija za vse model(300. vrstica)
+ */
