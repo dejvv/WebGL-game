@@ -314,24 +314,24 @@ class Model {
         this.nPoints = indices.length; // stevilo tock
         this.world = mat4.create();
     }
-    // vertex
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.STATIC_DRAW);
-
-    // normal
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.nbo);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.normals), gl.STATIC_DRAW);
-
-    // index
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.ibo);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.indices), gl.STATIC_DRAW);
-
-    // texture
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.tbo);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.texture), gl.STATIC_DRAW);
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+    // // vertex
+    // gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
+    // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.STATIC_DRAW);
+    //
+    // // normal
+    // gl.bindBuffer(gl.ARRAY_BUFFER, this.nbo);
+    // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.normals), gl.STATIC_DRAW);
+    //
+    // // index
+    // gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.ibo);
+    // gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.indices), gl.STATIC_DRAW);
+    //
+    // // texture
+    // gl.bindBuffer(gl.ARRAY_BUFFER, this.tbo);
+    // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.texture), gl.STATIC_DRAW);
+    //
+    // gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    // gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
 }
 /**
  * pred vsakim risanje potrebno shraniti view matriko z mvPushMatrix() in jo potem restorati z mvPopMatrix
