@@ -16,51 +16,87 @@ function start() {
     gl.depthFunc(gl.LEQUAL);
 
 
-    // Initialize the shaders; this is where all the lighting for the
-    // vertices and so forth is established.
+    Promise.all([
+        loadExternalModel('./assets/Susan.json'),
+        loadExternalModel('./assets/horse.json')
+    ]).then((models) => {
+        setModelsAttributes(models);
+        initShaders();
+        initBuffers();
+        initTextures();
+        loadWorld();
 
-    loadExternalModel()
-        .then(() => {
-            initShaders();
-            initBuffers();
-            initTextures();
-            loadWorld();
+        document.onkeydown = handleKeyDown;
+        document.onkeyup = handleKeyUp;
 
-            document.onkeydown = handleKeyDown;
-            document.onkeyup = handleKeyUp;
+        requestAnimationFrame(tick);
+    });
 
-            requestAnimationFrame(tick);
-        })
+    // loadExternalModel()
+    //     .then(() => {
+    //         initShaders();
+    //         initBuffers();
+    //         initTextures();
+    //         loadWorld();
+    //
+    //         document.onkeydown = handleKeyDown;
+    //         document.onkeyup = handleKeyUp;
+    //
+    //         requestAnimationFrame(tick);
+    //     });
 
 }
-
-function loadExternalModel() {
+// naloži model iz določene poti in vrne Objekt
+function loadExternalModel(pot) {
     return new Promise((resolve, reject) => {
-        loadJSONResource('./assets/Susan.json', function (modelErr, modelObj) {
+        loadJSONResource(pot, function (modelErr, modelObj) {
             if (modelErr) {
                 alert('Fatal error getting Susan model (see console)');
                 console.error("[JSON model] ", fsErr);
                 reject(fsErr);
             } else {
                 console.log("[JSON model] successfuly loaded:", modelObj);
-                susanObject = modelObj;
-                susanVertices = susanObject.meshes[0].vertices;
-                susanIndices = [].concat.apply([], susanObject.meshes[0].faces);
-                susanTexCoords = susanObject.meshes[0].texturecoords[0];
-                susanNormals = susanObject.meshes[0].normals;
-                resolve();
+                resolve(modelObj);
             }
         });
     })
 
 }
 
-let susanObject;
+// normalizira tabelo števil na range med maxNew in minNew
+function normalizeArray(array, maxNew = 1, minNew = 0){
+    let normalized = [];
+    let max = Math.max(...array);
+    let min = Math.min(...array);
+    let c = (maxNew - minNew)/(max - min);
 
-let susanVertices;
-let susanIndices;
-let susanTexCoords;
-let susanNormals;
+    for(let i = 0; i < array.length; i++){
+        normalized.push(c * ((array[i]-max)+max));
+    }
+    return normalized;
+}
+
+function setModelsAttributes(models){
+    susanObject = models[0];
+    susanVertices = susanObject.meshes[0].vertices;
+    susanIndices = [].concat.apply([], susanObject.meshes[0].faces);
+    susanTexCoords = susanObject.meshes[0].texturecoords[0];
+    susanNormals = susanObject.meshes[0].normals;
+
+    horseObject = models[1];
+    horseVertices = normalizeArray(horseObject.meshes[0].vertices, 1, -1);
+    horseIndices = [].concat.apply([], horseObject.meshes[0].faces);
+    horseTexCoords = horseObject.meshes[0].texturecoords[0];
+    horseNormals = horseObject.meshes[0].normals;
+
+    susanObject = new Model(
+        gl,  // gl
+        models[0].meshes[0].vertices, // točke
+        models[0].meshes[0].normals, // normale
+        [].concat.apply([], models[0].meshes[0].faces), // indices
+        models[0].meshes[0].texturecoords[0] // textureCoords
+    );
+}
 
 function setMatrixUniforms() {
     gl.uniformMatrix4fv(shaderProgram.projMatrixUniform, false, projMatrix);
@@ -107,6 +143,13 @@ function initTextures() {
         handleTextureLoaded(susanTexture);
     };
     susanTexture.image.src = "./assets/SusanTexture.png";
+
+    horseTexture = gl.createTexture();
+    horseTexture.image = new Image();
+    horseTexture.image.onload = function () {
+        handleTextureLoaded(horseTexture);
+    };
+    horseTexture.image.src = "./assets/Horse.png";
 
 }
 
@@ -295,44 +338,25 @@ function initBuffers() {
     susanVertexNormalBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, susanVertexNormalBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(susanNormals), gl.STATIC_DRAW);
+
+    // horse
+    horseVertexPositionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, horseVertexPositionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(horseVertices), gl.STATIC_DRAW);
+
+    horseVertexTextureCoordBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, horseVertexTextureCoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(horseTexCoords), gl.STATIC_DRAW);
+
+    horseVertexIndexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, horseVertexIndexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(horseIndices), gl.STATIC_DRAW);
+
+    horseVertexNormalBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, horseVertexNormalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(horseNormals), gl.STATIC_DRAW);
 }
 
-// Gradnja modela
-class Model {
-    Model(gl, coordinates, vertices, normals, indices, texture){
-        this.coordinates = coordinates; // koordinati - tudi v this.world, ki je matrika
-        this.vertices = vertices; // točke
-        this.normals = normals; // normale
-        this.indices = indices; // povezave med točkami -> tvorijo trikotnik
-        this.texture = texture; // za texture
-
-        this.vbo = gl.createBuffer(); // vertex buffer
-        this.ibo = gl.createBuffer(); // indices buffer
-        this.nbo = gl.createBuffer(); // normals buffer
-        this.tbo = gl.createBuffer(); // texture buffer
-
-        this.nPoints = indices.length; // stevilo tock
-        this.world = mat4.create();
-    }
-    // // vertex
-    // gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-    // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.STATIC_DRAW);
-    //
-    // // normal
-    // gl.bindBuffer(gl.ARRAY_BUFFER, this.nbo);
-    // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.normals), gl.STATIC_DRAW);
-    //
-    // // index
-    // gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.ibo);
-    // gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.indices), gl.STATIC_DRAW);
-    //
-    // // texture
-    // gl.bindBuffer(gl.ARRAY_BUFFER, this.tbo);
-    // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.texture), gl.STATIC_DRAW);
-    //
-    // gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    // gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
-}
 /**
  * pred vsakim risanje potrebno shraniti view matriko z mvPushMatrix() in jo potem restorati z mvPopMatrix
  */
@@ -373,8 +397,9 @@ function renderGame(now) {
     gl.drawArrays(gl.TRIANGLES, 0, worldVertexPositionBuffer.numItems);
     mvPopMatrix();
 
-    // // rišem susan
+    // rišem susan
     mvPushMatrix();
+    //mat4.translate(world matrika, object.world, pomik);
     mat4.translate(worldMatrix, worldMatrix, [-5, 2.0, -7.0]);
     mat4.rotateX(worldMatrix, worldMatrix, angle);
     gl.bindBuffer(gl.ARRAY_BUFFER, susanVertexPositionBuffer);
@@ -396,6 +421,30 @@ function renderGame(now) {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, susanVertexIndexBuffer);
     setMatrixUniforms();
     gl.drawElements(gl.TRIANGLES, susanIndices.length, gl.UNSIGNED_SHORT, 0);
+    mvPopMatrix();
+
+    // // rišem horse
+    mvPushMatrix();
+    mat4.translate(worldMatrix, worldMatrix, [-5, 0.0, -3.0]);
+    mat4.rotateY(worldMatrix, worldMatrix, angle);
+    gl.bindBuffer(gl.ARRAY_BUFFER, horseVertexPositionBuffer);
+    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+    // gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, horseVertexTextureCoordBuffer);
+    gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 2 * Float32Array.BYTES_PER_ELEMENT, 0);
+    // gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, horseVertexNormalBuffer);
+    gl.vertexAttribPointer(shaderProgram.normalAttribute, 3, gl.FLOAT, gl.TRUE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, horseTexture);
+    gl.uniform1i(shaderProgram.samplerUniform, 0);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, horseVertexIndexBuffer);
+    setMatrixUniforms();
+    gl.drawElements(gl.TRIANGLES, horseIndices.length, gl.UNSIGNED_SHORT, 0);
     mvPopMatrix();
 
     // // rišem 1. kvadrat
@@ -465,7 +514,7 @@ function animate() {
 
 // Samo za animacijo
 function tick(time) {
-    if (texturesLoaded === 4) { // only draw scene and animate when textures are loaded.
+    if (texturesLoaded === 5) { // only draw scene and animate when textures are loaded.
         animate();
         handleKeys();
         renderGame(time);
@@ -515,7 +564,21 @@ let susanVertexPositionBuffer;
 let susanVertexTextureCoordBuffer;
 let susanVertexIndexBuffer;
 let susanVertexNormalBuffer;
+let susanObject;
+let susanVertices;
+let susanIndices;
+let susanTexCoords;
+let susanNormals;
 
+let horseVertexPositionBuffer;
+let horseVertexTextureCoordBuffer;
+let horseVertexIndexBuffer;
+let horseVertexNormalBuffer;
+let horseObject;
+let horseVertices;
+let horseIndices;
+let horseTexCoords;
+let horseNormals;
 
 // matrike
 let worldMatrix = mat4.create(); // matrika sveta
@@ -550,6 +613,7 @@ let boxTexture;
 let groundTexture;
 let heheTexture;
 let susanTexture;
+let horseTexture;
 
 // Variable that stores  loading state of textures.
 let texturesLoaded = 0;
@@ -615,40 +679,6 @@ const fragmentShaderText = [
     'sun.color * max(dot(fragNormal, normSunDir), 0.0);',
     '',
     'gl_FragColor = vec4(texel.rgb * lightIntensity, texel.a);',
-    '}'
-].join('\n');
-
-// ni pomembno trenutno
-const vertexShaderDoom = [
-    'precision mediump float;',
-    '',
-    'attribute vec3 aVertexPosition;',
-    'attribute vec2 aTextureCoord;',
-    'varying ',
-    'uniform mat4 mView;',
-    'uniform mat4 mProj;',
-
-    // variable for passing texture coordinates
-    // from vertex shader to fragment shader
-    'varying vec2 vTextureCoord;',
-
-    'void main(void) {',
-    'gl_Position = mProj * mView * vec4(aVertexPosition, 1.0);',
-    'vTextureCoord = aTextureCoord;',
-    '}'
-].join('\n');
-
-const fragmentShaderDoom = [
-    'precision mediump float;',
-    '',
-    // uniform attribute for setting texture coordinates
-    'varying vec2 vTextureCoord;',
-    // uniform attribute for setting 2D sampler
-    'uniform sampler2D uSampler;',
-    '',
-    'void main(void) {',
-    // sample the fragment color from texture
-    ' gl_FragColor = texture2D(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));',
     '}'
 ].join('\n');
 
