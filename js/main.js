@@ -18,7 +18,9 @@ function start() {
 
     Promise.all([
         loadExternalModel('./assets/Susan.json'),
-        loadExternalModel('./assets/horse.json')
+        loadExternalModel('./assets/horse.json'),
+        loadExternalModel('./assets/Banana.json'),
+        loadExternalModel('./assets/wolfB.json')
     ]).then((models) => {
         setModelsAttributes(models);
         initShaders();
@@ -89,6 +91,18 @@ function setModelsAttributes(models){
     horseTexCoords = horseObject.meshes[0].texturecoords[0];
     horseNormals = horseObject.meshes[0].normals;
 
+    bananaObject = models[2];
+    bananaVertices = normalizeArray(bananaObject.meshes[0].vertices, 1, -1);
+    bananaIndices = [].concat.apply([], bananaObject.meshes[0].faces);
+    bananaTexCoords = bananaObject.meshes[0].texturecoords[0];
+    bananaNormals = bananaObject.meshes[0].normals;
+
+    wolfObject = models[3];
+    wolfVertices = normalizeArray(wolfObject.meshes[0].vertices, 1, -1);
+    wolfIndices = [].concat.apply([], wolfObject.meshes[0].faces);
+    wolfTexCoords = wolfObject.meshes[0].texturecoords[0];
+    wolfNormals = wolfObject.meshes[0].normals;
+
     susanObject = new Model(
         gl,  // gl
         models[0].meshes[0].vertices, // točke
@@ -151,14 +165,33 @@ function initTextures() {
     };
     horseTexture.image.src = "./assets/Horse.png";
 
+    bananaTexture = gl.createTexture();
+    bananaTexture.image = new Image();
+    bananaTexture.image.onload = function () {
+        handleTextureLoaded(bananaTexture, "clamp");
+    };
+    bananaTexture.image.src = "./assets/Banana.png";
+
+    wolfTexture = gl.createTexture();
+    wolfTexture.image = new Image();
+    wolfTexture.image.onload = function () {
+        handleTextureLoaded(wolfTexture, "clamp");
+    };
+    wolfTexture.image.src = "./assets/wolfB.png";
+
 }
 
-function handleTextureLoaded(texture) {
+function handleTextureLoaded(texture, img) {
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);
+    if(img === "clamp"){
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    } else {
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);
+    }
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texImage2D(
@@ -355,6 +388,40 @@ function initBuffers() {
     horseVertexNormalBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, horseVertexNormalBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(horseNormals), gl.STATIC_DRAW);
+
+    // banana
+    bananaVertexPositionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, bananaVertexPositionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(bananaVertices), gl.STATIC_DRAW);
+
+    bananaVertexTextureCoordBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, bananaVertexTextureCoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(bananaTexCoords), gl.STATIC_DRAW);
+
+    bananaVertexIndexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bananaVertexIndexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(bananaIndices), gl.STATIC_DRAW);
+
+    bananaVertexNormalBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, bananaVertexNormalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(bananaNormals), gl.STATIC_DRAW);
+
+    // wolf
+    wolfVertexPositionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, wolfVertexPositionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(wolfVertices), gl.STATIC_DRAW);
+
+    wolfVertexTextureCoordBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, wolfVertexTextureCoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(wolfTexCoords), gl.STATIC_DRAW);
+
+    wolfVertexIndexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, wolfVertexIndexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(wolfIndices), gl.STATIC_DRAW);
+
+    wolfVertexNormalBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, wolfVertexNormalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(wolfNormals), gl.STATIC_DRAW);
 }
 
 /**
@@ -371,6 +438,8 @@ function renderGame(now) {
     fpsCounter(now);
     // obračanje
     angle = now / 1000 / 6 * 2 * Math.PI;
+    // poskrbim da ni kolizij
+    noCollision();
 
     mat4.perspective(projMatrix, glMatrix.toRadian(45), gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
     mat4.identity(viewMatrix);
@@ -401,7 +470,7 @@ function renderGame(now) {
     // rišem susan
     mvPushMatrix();
     //mat4.translate(world matrika, object.world, pomik);
-    mat4.translate(worldMatrix, worldMatrix, [-5, 1, -7.0]);
+    mat4.translate(worldMatrix, worldMatrix, [0, 5.0, -17.0]);
     mat4.rotateX(worldMatrix, worldMatrix, angle);
     gl.bindBuffer(gl.ARRAY_BUFFER, susanVertexPositionBuffer);
     gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
@@ -423,15 +492,15 @@ function renderGame(now) {
     gl.drawElements(gl.TRIANGLES, susanIndices.length, gl.UNSIGNED_SHORT, 0);
     mvPopMatrix();
 
-    // Objekten način - dela
+    //Objekten način - dela
     // mvPushMatrix();
-    // mat4.translate(worldMatrix, worldMatrix, [-5, 1, -2.0]);
-    // susanObject.vertexBuffer();
+    // mat4.translate(worldMatrix, worldMatrix, [10, 1, -2.0]);
+    // bananaObject.vertexBuffer();
     // gl.activeTexture(gl.TEXTURE0);
-    // gl.bindTexture(gl.TEXTURE_2D, susanTexture);
+    // gl.bindTexture(gl.TEXTURE_2D, camelTexture);
     // gl.uniform1i(shaderProgram.samplerUniform, 0);
     // setMatrixUniforms();
-    // susanObject.draw();
+    // bananaObject.draw();
     // mvPopMatrix();
 
     // // rišem horse
@@ -461,10 +530,61 @@ function renderGame(now) {
     gl.drawElements(gl.TRIANGLES, horseIndices.length, gl.UNSIGNED_SHORT, 0);
     mvPopMatrix();
 
+    // // rišem banana
+    mvPushMatrix();
+    mat4.translate(worldMatrix, worldMatrix, [banana.positionx, 0.0, banana.positionz]);
+    // mat4.rotateY(worldMatrix, worldMatrix, angle);
+    gl.bindBuffer(gl.ARRAY_BUFFER, bananaVertexPositionBuffer);
+    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+    // gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, bananaVertexTextureCoordBuffer);
+    gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 2 * Float32Array.BYTES_PER_ELEMENT, 0);
+    // gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, bananaVertexNormalBuffer);
+    gl.vertexAttribPointer(shaderProgram.normalAttribute, 3, gl.FLOAT, gl.TRUE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, bananaTexture);
+    gl.uniform1i(shaderProgram.samplerUniform, 0);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bananaVertexIndexBuffer);
+    setMatrixUniforms();
+    gl.drawElements(gl.TRIANGLES, bananaIndices.length, gl.UNSIGNED_SHORT, 0);
+    mvPopMatrix();
+
+    // // rišem wolf
+    mvPushMatrix();
+    premakniObjekt(wolf); // izračun premik
+    spremeniSmer(wolf); // sprememba smeri
+    mat4.translate(worldMatrix, worldMatrix, [wolf.positionx, 0.0, wolf.positionz]);
+
+    // mat4.rotateY(worldMatrix, worldMatrix, angle);
+    gl.bindBuffer(gl.ARRAY_BUFFER, wolfVertexPositionBuffer);
+    gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+    // gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, wolfVertexTextureCoordBuffer);
+    gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 2 * Float32Array.BYTES_PER_ELEMENT, 0);
+    // gl.enableVertexAttribArray(shaderProgram.textureCoordAttribute);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, wolfVertexNormalBuffer);
+    gl.vertexAttribPointer(shaderProgram.normalAttribute, 3, gl.FLOAT, gl.TRUE, 3 * Float32Array.BYTES_PER_ELEMENT, 0);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, wolfTexture);
+    gl.uniform1i(shaderProgram.samplerUniform, 0);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, wolfVertexIndexBuffer);
+    setMatrixUniforms();
+    gl.drawElements(gl.TRIANGLES, wolfIndices.length, gl.UNSIGNED_SHORT, 0);
+    mvPopMatrix();
+
     // // rišem 1. kvadrat
     // narišem ga malo levo od mene, gledam v [0,0,0] torej čisto v center
     mvPushMatrix();
-    mat4.translate(worldMatrix, worldMatrix, [-1.5, 1.0, -7.0]);
+    mat4.translate(worldMatrix, worldMatrix, [b1.positionx, 1.0, b1.positionz]);
     gl.bindBuffer(gl.ARRAY_BUFFER, box1VertexBufferObject);
     gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 5 * Float32Array.BYTES_PER_ELEMENT, 0);
     gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 5 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
@@ -481,7 +601,7 @@ function renderGame(now) {
     // // rišem 2. kvadrat
     // narišem ga malo desno od mene, gledam v [0,0,0] torej čisto v center
     mvPushMatrix();
-    mat4.translate(worldMatrix, worldMatrix, [1.5, 1.0, -7.0]);
+    mat4.translate(worldMatrix, worldMatrix, [b2.positionx, 1.0, b2.positionz]);
     gl.bindBuffer(gl.ARRAY_BUFFER, box2VertexBufferObject);
     gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, 3, gl.FLOAT, gl.FALSE, 5 * Float32Array.BYTES_PER_ELEMENT, 0);
     gl.vertexAttribPointer(shaderProgram.textureCoordAttribute, 2, gl.FLOAT, gl.FALSE, 5 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
@@ -505,16 +625,25 @@ function renderGame(now) {
 }
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 let steviloIteracij = 0;
+let objekti = [];
 
-let hx = randomIntFromInterval(-15, 15);
-let hz = randomIntFromInterval(-15, 15);
+let horse = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15));
+let wolf = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15));
+let banana = new Direction(-5.0,-2.0,0,0, "banana");
+let b1 = new Direction(-1.5,-7.0,0,0);
+let b2 = new Direction(1.5,-7.0,0,0);
+objekti.push(horse);
+objekti.push(wolf);
+objekti.push(banana);
+objekti.push(b1);
+objekti.push(b2);
 
-let horse = new Direction(hx, hz, 0, 0);
 // objekto spremeni smer
 function spremeniSmer(object){
     if(steviloIteracij % 120 === 0){
         object.speedx = randomIntFromInterval(-5, 5) / 100;
         object.speedz = randomIntFromInterval(-5, 5) / 100;
+        angle *= -1;
     }
 }
 // premakni objekt
@@ -527,6 +656,27 @@ function premakniObjekt(object){
     }
     object.positionx += object.speedx;
     object.positionz += object.speedz;
+}
+
+// metoda vrne ali je kateri objekt bil deležen v trku s strani drugega objekta
+function isCollision(object, x, z){
+    return object.hitted(x, z);
+}
+// funkcija gre skozi vse predmete in preveri ali se dotikajo in jih obrne
+function noCollision(){
+    for(let i = 0; i < objekti.length; i++){
+        for(let j = 0; j < objekti.length; j++){
+            if(i === j) break; // nemore objetk samega sebe zadet
+            let c = isCollision(objekti[i], objekti[j].positionx, objekti[j].positionz);
+            if(c) {
+                objekti[i].speedx *= -1;
+                objekti[i].speedz *= -1;
+                objekti[j].speedx *= -1;
+                objekti[j].speedz *= -1;
+                console.log("[COLLISION] on: (", objekti[j].positionx, objekti[j].positionz, ")");
+            }
+        }
+    }
 }
 
 function randomIntFromInterval(min,max) {
@@ -558,7 +708,7 @@ function animate() {
 
 // Samo za animacijo
 function tick(time) {
-    if (texturesLoaded === 5) { // only draw scene and animate when textures are loaded.
+    if (texturesLoaded === 7) { // only draw scene and animate when textures are loaded.
         animate();
         handleKeys();
         renderGame(time);
@@ -624,6 +774,26 @@ let horseIndices;
 let horseTexCoords;
 let horseNormals;
 
+let bananaVertexPositionBuffer;
+let bananaVertexTextureCoordBuffer;
+let bananaVertexIndexBuffer;
+let bananaVertexNormalBuffer;
+let bananaObject;
+let bananaVertices;
+let bananaIndices;
+let bananaTexCoords;
+let bananaNormals;
+
+let wolfVertexPositionBuffer;
+let wolfVertexTextureCoordBuffer;
+let wolfVertexIndexBuffer;
+let wolfVertexNormalBuffer;
+let wolfObject;
+let wolfVertices;
+let wolfIndices;
+let wolfTexCoords;
+let wolfNormals;
+
 // matrike
 let worldMatrix = mat4.create(); // matrika sveta
 let projMatrix = mat4.create(); // projekcijska matrika
@@ -658,6 +828,8 @@ let groundTexture;
 let heheTexture;
 let susanTexture;
 let horseTexture;
+let bananaTexture;
+let wolfTexture;
 
 // Variable that stores  loading state of textures.
 let texturesLoaded = 0;

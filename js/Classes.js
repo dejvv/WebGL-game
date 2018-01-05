@@ -62,11 +62,12 @@ class Model {
 
 // Struktura za hitrost
 class Direction{
-    constructor(positionx, positionz, speedx = 0.05, speedz = 0.05){
+    constructor(positionx, positionz, speedx = 0.05, speedz = 0.05, name = "nevermind"){
         this.positionx = positionx;
         this.positionz = positionz;
         this.speedx = speedx;
         this.speedz = speedz;
+        this.name = name; // ime, pride prav ko gre za banano, da jo lahko odstranim
 
         this.radius = 1; // gledam na vse objekte kot da so krog
     }
