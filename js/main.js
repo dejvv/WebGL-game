@@ -627,8 +627,8 @@ function renderGame(now) {
 let steviloIteracij = 0;
 let objekti = [];
 
-let horse = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15));
-let wolf = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15));
+let horse = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15), 0, 0, "horse");
+let wolf = new Direction(randomIntFromInterval(-15, 15), randomIntFromInterval(-15, 15), 0, 0, "wolf");
 let banana = new Direction(-5.0,-2.0,0,0, "banana");
 let b1 = new Direction(-1.5,-7.0,0,0);
 let b2 = new Direction(1.5,-7.0,0,0);
@@ -641,8 +641,8 @@ objekti.push(b2);
 // objekto spremeni smer
 function spremeniSmer(object){
     if(steviloIteracij % 120 === 0){
-        object.speedx = randomIntFromInterval(-5, 5) / 100;
-        object.speedz = randomIntFromInterval(-5, 5) / 100;
+        object.speedx = randomIntFromInterval(-5, 5) / 10;
+        object.speedz = randomIntFromInterval(-5, 5) / 10;
         angle *= -1;
     }
 }
@@ -673,7 +673,11 @@ function noCollision(){
                 objekti[i].speedz *= -1;
                 objekti[j].speedx *= -1;
                 objekti[j].speedz *= -1;
-                console.log("[COLLISION] on: (", objekti[j].positionx, objekti[j].positionz, ")");
+                console.log("[COLLISION] on: (",objekti[j].positionx, objekti[j].positionz,")");
+                console.log("[COLLISION] between:",objekti[i].name,"and",objekti[j].name)
+            }
+            if(c && (objekti[j].name === "banana" || objekti[i].name === "banana")){
+                console.log("you spotted a bananaaaaaaaaanaaaaaa!");
             }
         }
     }
