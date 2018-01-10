@@ -493,7 +493,9 @@ function renderGame(now) {
 
     // ce je prislo do kolizijo ali je cca 10s mimo, se banana odstrani
     if(bananaPostavljena % 600 == 0){
+        bananaPostavljena = 1;
         izrisHrane = false;
+        bananaPreveri = false;
         zivljenja--;
     } else{
         tocke++;
@@ -760,10 +762,15 @@ function isCollision(object, x, z){
     return object.hitted(x, z);
 }
 // funkcija gre skozi vse predmete in preveri ali se dotikajo in jih obrne
+let bananaPreveri = true;
+let n;
 function noCollision(){
     let a = [];
-    for(let i = 0; i < objekti.length; i++){
-        for(let j = 0; j < objekti.length; j++){
+    if(bananaPreveri) n = objekti.length;
+    else n = objekti.length - 1;
+
+    for(let i = 0; i < n; i++){
+        for(let j = 0; j < n; j++){
             if(i === j) break; // nemore objetk samega sebe zadet
             collision = isCollision(objekti[i], objekti[j].positionx, objekti[j].positionz);
             if(collision) {
@@ -781,6 +788,8 @@ function noCollision(){
             if(collision && (objekti[j].name === "banana" || objekti[i].name === "banana")){
                 console.log("you spotted a bananaaaaaaaaanaaaaaa!");
                 izrisHrane = false;
+                bananaPreveri = false;
+                tocke += 1000;
             }
         }
     }
@@ -1086,7 +1095,10 @@ function handleKeys() {
             xhrana = xPosition;
             zhrana = zPosition;
             bananaPostavljena = 1;
+            bananaPreveri = true;
             console.log("Banana placed: (", xhrana, zhrana,")");
+            objekti.pop();
+            objekti.push(new Direction(xhrana, zhrana, 0,0, "banana"));
         }
     }
 }
